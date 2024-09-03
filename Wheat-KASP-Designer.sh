@@ -32,8 +32,9 @@ usage() {
     exit 1
 }
 
-# Set verbose to false automatically
+# Set verbose and debug to false automatically
 verbose=false
+debug=false
 
 # Check if there are no argments
 if [ $# -eq 0 ]; then
@@ -68,6 +69,11 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             usage
             ;;
+        -d|--debug)
+            debug=true
+            shift
+            shift            
+            ;;            
         -v|--verbose)
             verbose=true
             shift
@@ -79,6 +85,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Send warning if debug = true
+if [ "$debug" = true ]; then
+    echo "### WARNING: DEBUG ACTIVE AND MAY MESS UP OUTPUTS!"
+fi
 
 # Check if required options are provided
 if [ -z "$input_file" ] || [ -z "$output_file" ] || [ -z "$reference_geno" ]; then
@@ -127,26 +138,28 @@ fi
 # Create a temporary directory
 tmp_dir=$(mktemp -d -t Wheat-KASP-Designer-XXXXXX)
 
-# # Define a cleanup function
-# cleanup() {
-#     # Display message
-#     if [ "$verbose" = true ]; then
-#         echo
-#         echo "### Cleaning up temporary directory: $tmp_dir"
-#     fi
-    
-#     # Remove directory
-#     rm -rf "$tmp_dir"
+if [ "$debug" = false ]; then
+    # Define a cleanup function
+    cleanup() {
+        # Display message
+        if [ "$verbose" = true ]; then
+            echo
+            echo "### Cleaning up temporary directory: $tmp_dir"
+        fi
+        
+        # Remove directory
+        rm -rf "$tmp_dir"
 
-#     # Display message
-#     if [ "$verbose" = true ]; then
-#         echo
-#         echo "### Temporary directory cleaned up. Exiting script."
-#     fi
-# }
+        # Display message
+        if [ "$verbose" = true ]; then
+            echo
+            echo "### Temporary directory cleaned up. Exiting script."
+        fi
+    }
 
-# # Ensure the cleanup function is called on script exit
-# trap cleanup EXIT
+    # Ensure the cleanup function is called on script exit
+    trap cleanup EXIT
+fi
 
 # Get working directory
 working_directory=$(pwd)
@@ -158,10 +171,12 @@ script_dir=$(realpath $(dirname $0))
 cd $tmp_dir
 
 # Debug info
-echo
-echo "### Temporary directory: $tmp_dir"
-echo "### SNP list: $real_path_snp_list"
-echo "### Current WD: $(pwd)"
+if [ "$debug" = true ]; then
+    echo
+    echo "### Temporary directory: $tmp_dir"
+    echo "### SNP list: $real_path_snp_list"
+    echo "### Current WD: $(pwd)"
+fi
 
 # First filter .vcf
 if [ -z "$snp_list" ]; then
@@ -212,14 +227,26 @@ if [ -n "$check1" ]; then
 fi
 
 # Now get the sequences using snp_sequence_puller.sh
-bash "$script_dir/SNP-Sequence-Puller/snp_sequence_puller_auto.sh" \
-    -i ./snp_seq_pull_input.txt \
-    -o ./snp_seq_pull_output.txt \
-    -r "$reference_geno"
+if [ "$verbose" = true ]; then
+    # Run with verbose option
+    bash "$script_dir/SNP-Sequence-Puller/snp_sequence_puller_auto.sh" \
+        -i ./snp_seq_pull_input.txt \
+        -o ./snp_seq_pull_output.txt \
+        -r "$reference_geno" \
+        -v
+else
+    # Run silent
+    bash "$script_dir/SNP-Sequence-Puller/snp_sequence_puller_auto.sh" \
+        -i ./snp_seq_pull_input.txt \
+        -o ./snp_seq_pull_output.txt \
+        -r "$reference_geno"
+fi
 
 # Remove any error lines from the output of the above script
 awk -F'\t' '$6 !~ /Error/' snp_seq_pull_output.txt > temp_file
+awk -F'\t' '$6 ~ /Error/' snp_seq_pull_output.txt > temp_file1
 mv temp_file snp_seq_pull_output.txt
+mv temp_file1 snp_seq_pull_output_errors.txt
 
 # Change back to working directory
 cd "$working_directory"
