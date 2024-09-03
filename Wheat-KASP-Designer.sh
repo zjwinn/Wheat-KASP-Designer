@@ -151,10 +151,17 @@ tmp_dir=$(mktemp -d -t Wheat-KASP-Designer-XXXXXX)
 # Get working directory
 working_directory=$(pwd)
 
-# Change directory
+# Pull the script location
+script_dir=$(realpath $(dirname $0))
+
+# Change to temp directory
 cd $tmp_dir
+
+# Debug info
+echo
 echo "### Temporary directory: $tmp_dir"
 echo "### SNP list: $real_path_snp_list"
+echo "### Current WD: $(pwd)"
 
 # First filter .vcf
 if [ -z "$snp_list" ]; then
@@ -192,8 +199,27 @@ fi
 echo -e "chr\tpos\tid\tref\talt" > snp_seq_pull_input.txt
 zcat filt.vcf.gz | grep -v '^#' | cut -f1-5 >> snp_seq_pull_input.txt
 
-# Now get the sequences using snp_sequence_puller.sh
+# Do check
+check1=$(zcat "$reference_geno" | head -n 1 | grep "Chr")
 
+# Check if chromosome names have Chr in them 
+if [ -n "$check1" ]; then
+    # Process the file with awk, skip the first line, and write to a temporary file
+    awk -F'\t' 'BEGIN {OFS="\t"} {if (NR > 1) $1="Chr"$1; print}' snp_seq_pull_input.txt > temp_file
+
+    # Move the temporary file back to the original file
+    mv temp_file snp_seq_pull_input.txt
+fi
+
+# Now get the sequences using snp_sequence_puller.sh
+bash "$script_dir/SNP-Sequence-Puller/snp_sequence_puller_auto.sh" \
+    -i ./snp_seq_pull_input.txt \
+    -o ./snp_seq_pull_output.txt \
+    -r "$reference_geno"
+
+# Remove any error lines from the output of the above script
+awk -F'\t' '$6 !~ /Error/' snp_seq_pull_output.txt > temp_file
+mv temp_file snp_seq_pull_output.txt
 
 # Change back to working directory
 cd "$working_directory"
