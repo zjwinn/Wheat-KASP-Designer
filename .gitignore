@@ -1,2 +1,5 @@
 # Ignore workspace for vscode
 Wheat-KASP-Designer.code-workspace
+
+# Ignore testing stuff
+test*
