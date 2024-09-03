@@ -192,6 +192,8 @@ fi
 echo -e "chr\tpos\tid\tref\talt" > snp_seq_pull_input.txt
 zcat filt.vcf.gz | grep -v '^#' | cut -f1-5 >> snp_seq_pull_input.txt
 
+# Now get the sequences using snp_sequence_puller.sh
+
 
 # Change back to working directory
 cd "$working_directory"
