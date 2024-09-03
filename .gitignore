@@ -3,3 +3,7 @@ Wheat-KASP-Designer.code-workspace
 
 # Ignore testing stuff
 test*
+
+# Ignore modules
+./primer3/
+./SNP-Sequence-Puller/
