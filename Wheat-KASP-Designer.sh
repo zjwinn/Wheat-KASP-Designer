@@ -172,6 +172,35 @@ if [ "$debug" = true ]; then
     echo "### Current WD: $(pwd)"
 fi
 
+# Get reference genome location and file name
+reference_geno_location=$(dirname "$reference_geno")
+reference_geno_file=$(basename "$reference_geno")
+
+# Check if the database exists or not
+if [ ! -f "$reference_geno_location/${reference_geno_file}.nal" ] && \
+   [ ! -f "$reference_geno_location/${reference_geno_file}.ndb" ] && \
+   [ ! -f "$reference_geno_location/${reference_geno_file}.njs" ]; then
+    # Display message
+    if [ "$verbose" = true ]; then
+        echo
+        echo "### BLAST database for the reference genome does not exist. Making database."
+    fi
+
+    # Make the database
+    makeblastdb -in "$reference_geno" -dbtype nucl -out "$reference_geno"
+fi
+
+if [ ! -f "$reference_geno_location/${reference_geno_file}.fai" ]; then
+    # Display message
+    if [ "$verbose" = true ]; then
+        echo
+        echo "### Genome index file does not exist. Making index."
+    fi
+
+    # Make the database
+    samtools faidx "$reference_geno"
+fi
+
 # First filter .vcf
 if [ -z "$snp_list" ]; then
     # Display message
@@ -252,24 +281,6 @@ mv temp_file1 snp_seq_pull_output_errors.txt
 if ! command -v blastn &> /dev/null; then
     echo "### Error: BLAST+ is not installed."
     exit 1
-fi
-
-# Get reference genome location and file name
-reference_geno_location=$(dirname "$reference_geno")
-reference_geno_file=$(basename "$reference_geno")
-
-# Check if the database exists or not
-if [ ! -f "$reference_geno_location/${reference_geno_file}.nal" ] && \
-   [ ! -f "$reference_geno_location/${reference_geno_file}.ndb" ] && \
-   [ ! -f "$reference_geno_location/${reference_geno_file}.njs" ]; then
-    # Display message
-    if [ "$verbose" = true ]; then
-        echo
-        echo "### BLAST database for the reference genome does not exist. Making database."
-    fi
-
-    # Make the database
-    makeblastdb -in "$reference_geno" -dbtype nucl -out "$refernce_geno_file"
 fi
 
 # Parse polymarker
