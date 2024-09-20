@@ -7,3 +7,6 @@ test*
 # Ignore modules
 ./primer3/
 ./SNP-Sequence-Puller/
+
+# Ignore VSCode workspace
+Wheat-KASP-Designer.code-workspace
