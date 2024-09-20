@@ -36,7 +36,7 @@ usage() {
 verbose=false
 debug=false
 
-# Check if there are no argments
+# Check if there are no arguments
 if [ $# -eq 0 ]; then
     echo "Error: No inputs provided" >&2
     usage
@@ -47,24 +47,20 @@ while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
         -i|--input-file)
-            input_file="$2"
-            shift
-            shift
+            input_file=$(realpath "$2")
+            shift 2
             ;;
         -o|--output-file)
-            output_file="$2"
-            shift
-            shift
+            output_file=$(realpath "$2")
+            shift 2
             ;;            
         -r|--reference-geno)
-            reference_geno="$2"
-            shift
-            shift
+            reference_geno=$(realpath "$2")
+            shift 2
             ;;
         -s|--snps)
-            snp_list="$2"
-            shift 
-            shift 
+            snp_list=$(realpath "$2")
+            shift 2
             ;;
         -h|--help)
             usage
@@ -72,12 +68,10 @@ while [[ $# -gt 0 ]]; do
         -d|--debug)
             debug=true
             shift
-            shift            
             ;;            
         -v|--verbose)
             verbose=true
             shift
-            shift            
             ;;
         *)
             echo "Unknown option: $1"
@@ -86,7 +80,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Send warning if debug = true
+# Enable debug mode if debug is true
 if [ "$debug" = true ]; then
     echo "### WARNING: DEBUG ACTIVE AND MAY MESS UP OUTPUTS!"
 fi
