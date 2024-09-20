@@ -209,7 +209,13 @@ echo -e "chr\tpos\tid\tref\talt" > snp_seq_pull_input.txt
 zcat filt.vcf.gz | grep -v '^#' | cut -f1-5 >> snp_seq_pull_input.txt
 
 # Do check
-check1=$(zcat "$reference_geno" | head -n 1 | grep "Chr")
+if [[ "$reference_geno" == *.gz ]]; then
+    # Use zcat for .gz files
+    check1=$(zcat "$reference_geno" | head -n 1 | grep "Chr")
+else
+    # Use cat for other files
+    check1=$(cat "$reference_geno" | head -n 1 | grep "Chr")
+fi
 
 # Check if chromosome names have Chr in them 
 if [ -n "$check1" ]; then
@@ -241,6 +247,36 @@ awk -F'\t' '$6 !~ /Error/' snp_seq_pull_output.txt > temp_file
 awk -F'\t' '$6 ~ /Error/' snp_seq_pull_output.txt > temp_file1
 mv temp_file snp_seq_pull_output.txt
 mv temp_file1 snp_seq_pull_output_errors.txt
+
+# Check if BLAST-plus is installed
+if ! command -v blastn &> /dev/null; then
+    echo "### Error: BLAST+ is not installed."
+    exit 1
+fi
+
+# Get reference genome location and file name
+reference_geno_location=$(dirname "$reference_geno")
+reference_geno_file=$(basename "$reference_geno")
+
+# Check if the database exists or not
+if [ ! -f "$reference_geno_location/${reference_geno_file}.nal" ] && \
+   [ ! -f "$reference_geno_location/${reference_geno_file}.ndb" ] && \
+   [ ! -f "$reference_geno_location/${reference_geno_file}.njs" ]; then
+    # Display message
+    if [ "$verbose" = true ]; then
+        echo
+        echo "### BLAST database for the reference genome does not exist. Making database."
+    fi
+
+    # Make the database
+    makeblastdb -in "$reference_geno" -dbtype nucl -out "$refernce_geno_file"
+fi
+
+# Parse polymarker
+python3 "$working_directory/parse_polymarker_input.py" snp_seq_pull_output.txt
+
+# Now blast
+blastn -task blastn -db $reference_geno -query for_blast.fa -outfmt "6 std qseq sseq slen" -num_threads 8 -out blast_out.txt
 
 # Change back to working directory
 cd "$working_directory"
