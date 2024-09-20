@@ -4,3 +4,6 @@
 [submodule "SNP-Sequence-Puller"]
 	path = SNP-Sequence-Puller
 	url = https://github.com/zjwinn/SNP-Sequence-Puller
+[submodule "muscle"]
+	path = muscle
+	url = https://github.com/rcedgar/muscle.git
