@@ -82,7 +82,9 @@ done
 
 # Enable debug mode if debug is true
 if [ "$debug" = true ]; then
-    echo "### WARNING: DEBUG ACTIVE AND MAY MESS UP OUTPUTS!"
+    echo "######################################################"
+    echo "### WARNING: DEBUG ACTIVE AND MAY MESS UP OUTPUTS! ###"
+    echo "######################################################"
 fi
 
 # Check if required options are provided
@@ -290,11 +292,17 @@ if ! command -v blastn &> /dev/null; then
     exit 1
 fi
 
+# Alter the file so that it looks correct for the python scripts
+awk 'NR > 1 {print $3 "," $1 "," $6}' snp_seq_pull_output.txt > snp_seq_pull_output.csv
+
 # Parse polymarker
-python3 "$script_dir/parse_polymarker_input.py" snp_seq_pull_output.txt
+python3 "$script_dir/bin/parse_polymarker_input.py" snp_seq_pull_output.csv
 
 # Now blast
 blastn -task blastn -db $reference_geno -query for_blast.fa -outfmt "6 std qseq sseq slen" -num_threads 8 -out blast_out.txt
+
+# Parse the blast output file and output the homelog contigs and flanking ranges
+python3 "$script_dir/bin/getflanking.py" snp_seq_pull_output.csv blast_out.txt temp_range.txt 3
 
 # Change back to working directory
 cd "$working_directory"
