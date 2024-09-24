@@ -109,6 +109,7 @@ if [ -n "$snp_list" ]; then
     real_path_snp_list=$(realpath "$snp_list")
 fi
 
+# Check verbose
 if [ "$verbose" = true ]; then
     # Print header
     echo
@@ -129,9 +130,21 @@ if [ "$verbose" = true ]; then
     echo "###############################################"
 fi
 
-# Create a temporary directory
-tmp_dir=$(mktemp -d -t Wheat-KASP-Designer-XXXXXX)
+# Get working directory     
+working_directory=$(pwd)    
 
+# Pull the script location  
+script_dir=$(realpath $(dirname $0))
+
+# Create a temporary directory
+if [ "$debug" = true ]; then
+    tmp_dir="$working_directory/tmp"
+    mkdir $tmp_dir
+else
+    tmp_dir=$(mktemp -d -t Wheat-KASP-Designer-XXXXXX)
+fi   
+
+# Make a cleanup function if debug is false
 if [ "$debug" = false ]; then
     # Define a cleanup function
     cleanup() {
@@ -154,12 +167,6 @@ if [ "$debug" = false ]; then
     # Ensure the cleanup function is called on script exit
     trap cleanup EXIT
 fi
-
-# Get working directory
-working_directory=$(pwd)
-
-# Pull the script location
-script_dir=$(realpath $(dirname $0))
 
 # Change to temp directory
 cd $tmp_dir
@@ -284,7 +291,7 @@ if ! command -v blastn &> /dev/null; then
 fi
 
 # Parse polymarker
-python3 "$working_directory/parse_polymarker_input.py" snp_seq_pull_output.txt
+python3 "$script_dir/parse_polymarker_input.py" snp_seq_pull_output.txt
 
 # Now blast
 blastn -task blastn -db $reference_geno -query for_blast.fa -outfmt "6 std qseq sseq slen" -num_threads 8 -out blast_out.txt
