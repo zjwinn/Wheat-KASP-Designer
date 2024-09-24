@@ -1,7 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# 
+#  getcaps
+#
+#  Copyright 2016 Junli Zhang <zhjl86@gmail.com>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -26,22 +28,37 @@
 # change the input wildcard and the paths of primer3 and muscle accordingly.
 # NOTES: the output primer pair includes the common primer and the primer with SNP A or T, you need to change the 3' nucleartide to get the primer for the other SNP.
 
+# Usage: getCAPS maximum_enzyme_price ($ per 1000 U) maximum_primer_Tm maximum_primer_size whether_to_pick_anyway (1 is yes, 0 is NO)
 ### Imported
 from subprocess import call
 import getopt, sys, os, re
 from glob import glob
 #########################
 
-blast = int(sys.argv[1]) # 0 or 1, whether to blast
-max_price = int(sys.argv[2])
-max_Tm = sys.argv[3] # max Tm, default 63, can be increased in case high GC region
+max_price = int(sys.argv[1])
+max_Tm = sys.argv[2] # max Tm, default 63, can be increased in case high GC region
+max_size = sys.argv[3] # max primer size, default 25, can be increased in case low GC region
+pick_anyway = sys.argv[4] # pick primer anyway even if it violates specific constrains
+primer3_path = sys.argv[5] # define the path of primer3
+muscle_path = sys.argv[6] # define the path of muscle
+
+common_settings = "PRIMER_TASK=generic" + "\n" + \
+				"PRIMER_MAX_SIZE=" + max_size + "\n" + \
+				"PRIMER_MIN_TM=57.0" + "\n" + \
+				"PRIMER_OPT_TM=60.0" + "\n" + \
+				"PRIMER_MAX_TM=" + max_Tm + "\n" + \
+				"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
+				"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
+				"PRIMER_LIBERAL_BASE=1" + "\n" + \
+				"PRIMER_NUM_RETURN=5"  + "\n" + \
+				"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
+				"PRIMER_PICK_ANYWAY=" + pick_anyway + "\n"
+
 # get all the raw sequences
 raw = glob("flanking_temp_marker*") # All file names start from "flanking"
 raw.sort()
 
 iupac = {"R": "AG", "Y": "TC", "S": "GC", "W": "AT", "K": "TG", "M": "AC"}
-
-
 
 # classes
 class Restriction_Enzyme(object):
@@ -55,6 +72,7 @@ class Restriction_Enzyme(object):
 		self.dcaps = "No"
 		self.allpos = [] # all the match positions in the template
 		self.change_pos = None
+		self.potential_primer = ""
 		self.price = int(name.split(',')[-1])
 
 class Primers(object):
@@ -88,23 +106,18 @@ class PrimerPair(object):
 		self.penalty = "NA"
 		self.product_size = 0
 
-
-
-
 #from sys import platform
-def get_software_path(base_path):
-	if sys.platform.startswith('linux'): # linux
-		primer3_path = base_path + "/primer3_core"
-		muscle_path = base_path + "/muscle"
-	elif sys.platform == "win32" or sys.platform == "cygwin": # Windows...
-		primer3_path = base_path + "/primer3_core.exe"
-		muscle_path = base_path + "/muscle.exe"
-	elif sys.platform == "darwin": # MacOSX
-		primer3_path = base_path + "/primer3_core_darwin64"
-		muscle_path = base_path + "/muscle3.8.31_i86darwin64"
-	return primer3_path, muscle_path
-
-
+# def get_software_path(base_path):
+# 	if sys.platform.startswith('linux'): # linux
+# 		primer3_path = base_path + "/primer3_core"
+# 		muscle_path = base_path + "/muscle"
+# 	elif sys.platform == "win32" or sys.platform == "cygwin": # Windows...
+# 		primer3_path = base_path + "/primer3_core.exe"
+# 		muscle_path = base_path + "/muscle.exe"
+# 	elif sys.platform == "darwin": # MacOSX
+# 		primer3_path = base_path + "/primer3_core_darwin64"
+# 		muscle_path = base_path + "/muscle3.8.31_i86darwin64"
+# 	return primer3_path, muscle_path
 
 # simple Tm calculator
 def Tm(seq):
@@ -187,8 +200,8 @@ def get_homeo_seq(fasta, target, ids, align_left, align_right):
 		targetSeq = s1[align_left:(align_right + 1)]
 		homeoSeq = s2[align_left:(align_right + 1)]
 		score1 = score_pairwise(targetSeq, homeoSeq) # score in multiple alignment
-		print "Targetseq ", targetSeq
-		print "homeoSeq  ", homeoSeq
+		# print "Targetseq ", targetSeq
+		# print "homeoSeq  ", homeoSeq
 		# Get the sequences for comparison
 		indexL, indexR, nL, nR = FindLongestSubstring(targetSeq, homeoSeq)
 		indexL += align_left
@@ -202,16 +215,16 @@ def get_homeo_seq(fasta, target, ids, align_left, align_right):
 		if len(seqR) < nR:
 			seqR = seqR + "-" * (nR - len(seqR))
 		seqk = seqL[::-1][:nL][::-1] + s2[indexL:indexR] + seqR[:nR]
-		print "seqk     :", seqk
+		#print "seqk     :", seqk
 		score2 = score_pairwise(targetSeq.replace("-",""), seqk)
 		# if there are more than 3 gaps, the Tm usually will be 10 C lower than the perfect match
 		# so just use gap shift 
 		if score1 > score2 and gap_diff(targetSeq, homeoSeq) < 4:
-			print "homeoSeq but remove all the gaps"
-			print "targetSeq:", targetSeq
-			print "homeoSeq :", homeoSeq
-			print "seqk     :", seqk
-			print "primer   :", targetSeq.replace("-","")
+			# print "homeoSeq but remove all the gaps"
+			# print "targetSeq:", targetSeq
+			# print "homeoSeq :", homeoSeq
+			# print "seqk     :", seqk
+			# print "primer   :", targetSeq.replace("-","")
 			seqk = "".join([homeoSeq[i] for i, c in enumerate(targetSeq) if c!='-'])
 		seq2comp.append(seqk)
 		#print k, "\t", seqk
@@ -234,7 +247,7 @@ def ReverseComplement(seq):
 
 
 def string_dif(s1, s2): # two strings with equal length
-	return [i for i in xrange(len(s1)) if s1[i] != s2[i]]
+	return [i for i in range(len(s1)) if s1[i] != s2[i]]
 
 def seq2pattern(seq):
 	iupac = {
@@ -265,6 +278,8 @@ def check_pattern(enzyme, wild_seq, mut_seq): # check whether enzyme can match w
 	snp_pos = string_dif(wild_seq, mut_seq)[0] # snp position in the template
 	enzyme_name = enzyme.name
 	enzyme_seq = enzyme.seq
+	SNP_A = wild_seq[snp_pos]
+	SNP_B = mut_seq[snp_pos]
 	for i in range(len(enzyme_seq)):
 		ss = seq2pattern(enzyme_seq[0:i] + "N" + enzyme_seq[i+1:]) # regular expression
 		#print "Enzyme, Enzyme seq, pattern ", enzyme_name, enzyme_seq, ss
@@ -272,15 +287,16 @@ def check_pattern(enzyme, wild_seq, mut_seq): # check whether enzyme can match w
 			if snp_pos in range(m.start(), m.end()) and not re.search(ss, mut_seq[m.start():m.end()]):
 				change_pos = m.start() + i # which was changed
 				if abs(snp_pos - change_pos) > 1: # to insure the introduced mutaton is at least 2 bases far from the snp
-					print "One nt can be changed to fit enzyme", enzyme.name
+					print(("One nt can be changed to fit enzyme", enzyme.name))
 					enzyme.dcaps = "Yes"
 					enzyme.template_seq = wild_seq[:change_pos] + enzyme_seq[i].upper() + wild_seq[change_pos+1:]
-					enzyme.change_pos = change_pos
+					enzyme.change_pos = change_pos + 1 # 1 based
+					enzyme.potential_primer = enzyme.template_seq[(snp_pos - 20):snp_pos] + "[" + SNP_A + "/" + SNP_B + "]" + enzyme.template_seq[(snp_pos + 1):(snp_pos + 21)]  # show changed sequences
 					if change_pos < snp_pos:
-						enzyme.primer_end_pos = range(change_pos + 1, snp_pos) # a list of primer end positions
+						enzyme.primer_end_pos = list(range(change_pos + 1, snp_pos)) # a list of primer end positions
 					else:
-						enzyme.primer_end_pos = range(snp_pos + 1, change_pos) # a list of primer end positions
-					print "change position and primer end postions are ", change_pos, enzyme.primer_end_pos
+						enzyme.primer_end_pos = list(range(snp_pos + 1, change_pos)) # a list of primer end positions
+					#print "change position and primer end postions are ", change_pos, enzyme.primer_end_pos
 					break
 		# break the loop if dcaps found
 		if enzyme.dcaps == "Yes":
@@ -304,7 +320,7 @@ def test_enzyme(enzyme, wild_seq, mut_seq): # enzyme is an Restriction_Enzyme ob
 	if len(wild_allpos) != len(mut_allpos): # snp cause digestion difference
 		enzyme.caps = "Yes"
 		enzyme.template_seq = wild_seq
-		print "CAPS found with enzyme ", enzyme_name
+		print(("CAPS found with enzyme ", enzyme_name))
 		return enzyme
 	# else no caps found, check dcaps
 	#snp_pos = string_dif(wild_seq, mut_seq)[0] # snp position in the template
@@ -319,44 +335,9 @@ def test_enzyme(enzyme, wild_seq, mut_seq): # enzyme is an Restriction_Enzyme ob
 		enzyme = check_pattern(enzyme, mut_seq, wild_seq)
 	return enzyme
 
-
-
 # function to count mismtaches
 def mismatchn (s1, s2):
 	return sum(c1!=c2 for c1,c2 in zip(s1,s2))
-
-# function to blast and parse the output of each primer in the wheat genome
-# depends on function: mismtachn
-def primer_blast(primer_for_blast, outfile_blast):
-	forblast = open("for_blast_primer.fa", 'w') # for blast against the gnome
-	for k, v in primer_for_blast.items(): # k is the sequence and v is the number
-		forblast.write(">" + v + "\n" + k + "\n")
-	forblast.close()
-	blast_hit = {} # matched chromosomes for primers: less than 2 mismatches in the first 4 bps from 3'
-	### for blast
-	reference = "/Library/WebServer/Documents/blast/db/nucleotide/161010_Chinese_Spring_v1.0_pseudomolecules.fasta"
-	cmd2 = 'blastn -task blastn -db ' + reference + ' -query for_blast_primer.fa -outfmt "6 std qseq sseq qlen slen" -num_threads 3 -word_size 7 -out ' + outfile_blast
-	print "Step 2: Blast command:\n", cmd2
-	call(cmd2, shell=True)
-	# process blast file
-	# blast fields
-	# IWB50236_7A_R	IWGSC_CSS_7DS_scaff_3919748	98.718	78	1	0	24	101	4891	4968	1.55e-30	138	CTCATCAAATGATTCAAAAATATCGATRCTTGGCTGGTGTATCGTGCAGACGACAGTTCGTCCGGTATCAACAGCATT	CTCATCAAATGATTCAAAAATATCGATGCTTGGCTGGTGTATCGTGCAGACGACAGTTCGTCCGGTATCAACAGCATT	101 5924
-	# Fields: 
-	# 1: query id, subject id, % identity, alignment length, mismatches, gap opens, 
-	# 7: q. start, q. end, s. start, s. end, evalue, bit score
-	# 13: q. sequence, s. sequence, q. length s. length
-	for line in open(outfile_blast):
-		if line.startswith('#'):
-			continue
-		fields = line.split("\t")
-		query, subject, pct_identity, align_length= fields[:4]
-		qstart, qstop, sstart, sstop = [int(x) for x in fields[6:10]]
-		qseq, sseq = fields[12:14]
-		qlen = int(fields[14])
-		n1 = qlen - qstop
-		if n1 < 2 and mismatchn(qseq[(n1 - 4):], sseq[(n1 - 4):]) + n1 < 2: # if less than 2 mismtaches in the first 4 bases from the 3' end of the primer
-			blast_hit[query] = blast_hit.setdefault(query, "") + ";" + subject + ":" + str(sstart)
-	return blast_hit
 
 # function to extract sequences from a fasta file 
 def get_fasta(infile):
@@ -503,7 +484,7 @@ def format_primer_seq(primer, variation): # input is a primer object and variati
 		seq = ReverseComplement(primer.seq)
 		#primer_range = range(primer.end - 1, primer.start)
 	
-	primer_range = range(start - 1, end)
+	primer_range = list(range(start - 1, end))
 	var_sites = set(variation).intersection(primer_range)
 	var_sites_relative = [i - start + 1 for i in var_sites]
 	#seq = primer.seq.lower()
@@ -520,20 +501,26 @@ def format_primer_seq(primer, variation): # input is a primer object and variati
 # parse the flanking sequence input
 
 def caps(seqfile):
-	#flanking_temp_marker_IWB1855_7A_R_251.fa
-	snpname, chrom, allele, pos =re.split("_|\.", seqfile)[3:7]
-	chrom = chrom[0:2] # no arm
+	#flanking_temp_marker_IWB1855_7A_R_251.txt.fa
+	#snpname, chrom, allele, pos =re.split("_|\.", seqfile)[3:7]
+	#snpname, chrom, allele, pos =re.split("_", seqfile[:-7])[3:7] # [:-7] remove .txt.fa in the file
+	info = re.split("_", seqfile[:-7])
+	snpname = info[3]
+	chrom = "_".join(info[4:-2])
+	allele = info[-2]
+	pos = info[-1]
 	snp_pos = int(pos) - 1 # 0-based
-	print "snpname, chrom, allele, pos ", snpname, chrom, allele, pos
+	print(("snpname, chrom, allele, pos ", snpname, chrom, allele, pos))
 	getcaps_path = os.path.dirname(os.path.realpath(__file__))
+	global_setting_file = getcaps_path + "/global_settings.txt"
 	directory = "CAPS_output"
 	if not os.path.exists(directory):
 		os.makedirs(directory)
 	out = directory + "/selected_CAPS_primers_" + snpname + ".txt"
-	print "Output selected CAPS file name is: ", out
+	print(("Output selected CAPS file name is: ", out))
 	
 	# software path
-	primer3_path, muscle_path = get_software_path(getcaps_path)
+	# primer3_path, muscle_path = get_software_path(getcaps_path)
 	
 	# get target and ids and rename fasta seq names
 	fasta_raw, target, ids = get_fasta2(seqfile, chrom)
@@ -550,7 +537,7 @@ def caps(seqfile):
 	REs = parse_RE_file(RE_file) # get the list of restriction enzymes
 	# step 2: get the list of enzymes that can be used for caps or dcaps
 	SNP_A, SNP_B = iupac[allele] # SNP 2 alleles
-	print "SNP_A, SNP_B ", SNP_A, SNP_B
+	print(("SNP_A, SNP_B ", SNP_A, SNP_B))
 	wild_seq = seq_template[:snp_pos] + SNP_A + seq_template[snp_pos+1:]
 	mut_seq = seq_template[:snp_pos] + SNP_B + seq_template[snp_pos+1:]
 	caps_list = []
@@ -564,15 +551,15 @@ def caps(seqfile):
 			caps_list.append(enzyme)
 		elif enzyme.dcaps == "Yes":
 			dcaps_list.append(enzyme)
-	print "caps_list is ", [x.name for x in caps_list]
-	print "dcaps_list is ", [x.name for x in dcaps_list]
+	print(("caps_list is ", [x.name for x in caps_list]))
+	print(("dcaps_list is ", [x.name for x in dcaps_list]))
 	variation = [] # variation sites that can differ ALL
 	variation2 = [] # variation sites that can differ at least 2 homeologs
 	
 	# STEP 0: create alignment file and primer3output file
 	RawAlignFile = "alignment_raw_" + snpname + ".fa"
 	alignmentcmd = muscle_path + " -in " + seqfile2 + " -out " + RawAlignFile + " -quiet"
-	print "Alignment command: ", alignmentcmd
+	print(("Alignment command: ", alignmentcmd))
 	call(alignmentcmd, shell=True)
 	
 	#########################
@@ -595,20 +582,11 @@ def caps(seqfile):
 					right_end = -1000000
 				#if right_end - left_end < product_min - 35 or right_end - left_end > product_max - 35: # suppose both primers are 18 bp
 				#	continue
-				settings = "PRIMER_TASK=generic" + "\n" + \
+				settings = common_settings + \
 				"SEQUENCE_ID=" + snpname + "-dCAPS-" + enzyme.name + "-" + enzyme.seq + "-" + str(primer_end_pos+1) + "\n" + \
 				"SEQUENCE_TEMPLATE=" + enzyme.template_seq + "\n" + \
 				"PRIMER_PRODUCT_SIZE_RANGE=150-200 200-250 70-150" + "\n" + \
 				"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getcaps_path + "/primer3_config/"  + "\n" + \
-				"PRIMER_MAX_SIZE=25" + "\n" + \
-				"PRIMER_MIN_TM=57.0" + "\n" + \
-				"PRIMER_OPT_TM=60.0" + "\n" + \
-				"PRIMER_MAX_TM=" + max_Tm + "\n" + \
-				"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
-				"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
-				"PRIMER_LIBERAL_BASE=1" + "\n" + \
-				"PRIMER_NUM_RETURN=5"  + "\n" + \
-				"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
 				"SEQUENCE_FORCE_LEFT_END=" + str(left_end) + "\n" + \
 				"SEQUENCE_FORCE_RIGHT_END=" + str(right_end) + "\n" + \
 				"="
@@ -620,20 +598,11 @@ def caps(seqfile):
 		left_end = -1000000
 		right_end = -1000000
 		for enzyme in caps_list:
-			settings = "PRIMER_TASK=generic" + "\n" + \
+			settings = common_settings + \
 			"SEQUENCE_ID=" + snpname + "-CAPS-" + enzyme.name + "-" + enzyme.seq  + "\n" + \
 			"SEQUENCE_TEMPLATE=" + enzyme.template_seq + "\n" + \
 			"PRIMER_PRODUCT_SIZE_RANGE=" + str(product_min) + "-" + str(product_max) + "\n" + \
 			"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getcaps_path + "/primer3_config/"  + "\n" + \
-			"PRIMER_MAX_SIZE=25" + "\n" + \
-			"PRIMER_MIN_TM=57.0" + "\n" + \
-			"PRIMER_OPT_TM=60.0" + "\n" + \
-			"PRIMER_MAX_TM=" + max_Tm + "\n" + \
-			"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
-			"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
-			"PRIMER_LIBERAL_BASE=1" + "\n" + \
-			"PRIMER_NUM_RETURN=5"  + "\n" + \
-			"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
 			"SEQUENCE_FORCE_LEFT_END=" + str(left_end) + "\n" + \
 			"SEQUENCE_FORCE_RIGHT_END=" + str(right_end) + "\n" + \
 			"SEQUENCE_TARGET=" + str(snp_pos - 20) + ",40" + "\n" + \
@@ -644,21 +613,21 @@ def caps(seqfile):
 		p3input.close()
 		
 		if n == 0:
-			print "No primer3 input were found"
+			print("No primer3 input were found")
 			outfile = open(out, 'w')
 			outfile.write("\nCAPS cut information for SNP " + snpname + "\n") # change to 1 based
-			outfile.write("Enzyme\tEnzyme_seq\tChange_pos\tOther_cut_pos\n")
+			outfile.write("Enzyme\tEnzyme_seq\tChange_pos\tOther_cut_pos\tPotential_primer\n")
 			for enzyme in caps_list:
 				outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\n")
 			outfile.write("\ndCAPS cut information for SNP " + snpname + "\n") # change to 1 based
 			for enzyme in dcaps_list:
-				outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + str(enzyme.change_pos) + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\n")
+				outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + str(enzyme.change_pos) + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\t" + enzyme.potential_primer + "\n")
 			outfile.close()
 			return 0
 		# primer3 output file
 		primer3output = directory + "/primer3.output." + snpname
-		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " " + primer3input
-		print "Primer3 command 1st time: ", p3cmd
+		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " -p3_settings_file=" + global_setting_file + " " + primer3input
+		print(("Primer3 command 1st time: ", p3cmd))
 		call(p3cmd, shell=True)
 		primerpairs = parse_primer3output(primer3output, 5)
 	else: # if there are homeolog sequences	
@@ -666,22 +635,12 @@ def caps(seqfile):
 		
 		########################
 		# read alignment file
-		fasta = get_fasta(RawAlignFile)
-
-		## get the variaiton site among sequences
-		#ids = [] # all other sequence names
-		#for kk in fasta.keys():
-			#key_chr = kk.split("_")[2] # sequence chromosome name
-			#if chrom in key_chr or key_chr in chrom: # 3B contig names do not have chromosome arm
-				#target = kk
-			#else:
-				#ids.append(kk)
-				
-		print "The target: ", target
-		print "The other groups: ", ids
+		fasta = get_fasta(RawAlignFile)				
+		print(("The target: ", target))
+		print(("The other groups: ", ids))
 
 		alignlen = len(fasta[target])
-		print "Alignment length: ", alignlen
+		print(("Alignment length: ", alignlen))
 		
 		# get the target ID template base coordinate in the alignment
 		t2a = {} # template to alignment
@@ -694,8 +653,8 @@ def caps(seqfile):
 			t2a[i - ngap] = i
 			a2t[i] = i - ngap
 
-		print "last key of t2a", i - ngap
-		print "last key of a2t", i
+		print(("last key of t2a", i - ngap))
+		print(("last key of a2t", i))
 		
 		seq_template = fasta[target].replace("-","") # remove all gaps
 		variation = [] # variation sites that can differ ALL
@@ -705,7 +664,7 @@ def caps(seqfile):
 		gap_left_target = len(fasta[target]) - len(fasta[target].lstrip('-'))
 		gap_left = max([len(v) - len(v.lstrip('-')) for k, v in fasta.items()])
 		gap_right = min([len(v.rstrip('-')) for k, v in fasta.items()])
-		print "gap_left_target, gap_left and gap_right: ", gap_left_target, gap_left, gap_right
+		print(("gap_left_target, gap_left and gap_right: ", gap_left_target, gap_left, gap_right))
 		
 		diffarray = {} # a list of 0 or 1: the same as or different from the site in each sequences of ids
 		for i in range(gap_left, gap_right): # exclude 20 bases on each side
@@ -745,8 +704,8 @@ def caps(seqfile):
 				if pos_template not in variation2: # in case multiple gaps
 					variation2.append(pos_template)
 		
-		print "Sites that can differ all\n", variation
-		print "\nSites that can differ at least 1\n", variation2
+		print(("Sites that can differ all\n", variation))
+		print(("\nSites that can differ at least 1\n", variation2))
 		#print "\nKeys of diffarray: ", diffarray.keys()
 		
 		########################################################
@@ -769,20 +728,11 @@ def caps(seqfile):
 						right_end = i + 1
 					if right_end - left_end < product_min - 35 or right_end - left_end > product_max - 35: # suppose both primers are 18 bp
 						continue
-					settings = "PRIMER_TASK=generic" + "\n" + \
+					settings = common_settings + \
 					"SEQUENCE_ID=" + snpname + "-dCAPS-" + enzyme.name + "-" + enzyme.seq + "-" + str(i+1) + "-" + str(primer_end_pos+1) + "\n" + \
 					"SEQUENCE_TEMPLATE=" + enzyme.template_seq + "\n" + \
 					"PRIMER_PRODUCT_SIZE_RANGE=" + str(product_min) + "-" + str(product_max) + "\n" + \
 					"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getcaps_path + "/primer3_config/"  + "\n" + \
-					"PRIMER_MAX_SIZE=25" + "\n" + \
-					"PRIMER_MIN_TM=57.0" + "\n" + \
-					"PRIMER_OPT_TM=60.0" + "\n" + \
-					"PRIMER_MAX_TM=" + max_Tm + "\n" + \
-					"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
-					"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
-					"PRIMER_LIBERAL_BASE=1" + "\n" + \
-					"PRIMER_NUM_RETURN=5"  + "\n" + \
-					"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
 					"SEQUENCE_FORCE_LEFT_END=" + str(left_end) + "\n" + \
 					"SEQUENCE_FORCE_RIGHT_END=" + str(right_end) + "\n" + \
 					"="
@@ -799,20 +749,11 @@ def caps(seqfile):
 				else:
 					left_end = -1000000
 					right_end = i + 1
-				settings = "PRIMER_TASK=generic" + "\n" + \
+				settings = common_settings + \
 				"SEQUENCE_ID=" + snpname + "-CAPS-" + enzyme.name + "-" + enzyme.seq + "-" + str(i+1) + "\n" + \
 				"SEQUENCE_TEMPLATE=" + enzyme.template_seq + "\n" + \
 				"PRIMER_PRODUCT_SIZE_RANGE=" + str(product_min) + "-" + str(product_max) + "\n" + \
 				"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getcaps_path + "/primer3_config/"  + "\n" + \
-				"PRIMER_MAX_SIZE=25" + "\n" + \
-				"PRIMER_MIN_TM=57.0" + "\n" + \
-				"PRIMER_OPT_TM=60.0" + "\n" + \
-				"PRIMER_MAX_TM=" + max_Tm + "\n" + \
-				"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
-				"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
-				"PRIMER_LIBERAL_BASE=1" + "\n" + \
-				"PRIMER_NUM_RETURN=5"  + "\n" + \
-				"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
 				"SEQUENCE_FORCE_LEFT_END=" + str(left_end) + "\n" + \
 				"SEQUENCE_FORCE_RIGHT_END=" + str(right_end) + "\n" + \
 				"SEQUENCE_TARGET=" + str(snp_pos - 20) + ",40" + "\n" + \
@@ -823,23 +764,23 @@ def caps(seqfile):
 		p3input.close()
 		
 		if n == 0:
-			print "No primer3 input were found"
+			print("No primer3 input were found")
 			outfile = open(out, 'w')
 			outfile.write("Sites that can differ all for " + snpname + "\n")
 			outfile.write(", ".join([str(x + 1) for x in variation])) # change to 1 based
 			outfile.write("\nCAPS cut information for SNP " + snpname + "\n") # change to 1 based
-			outfile.write("Enzyme\tEnzyme_seq\tChange_pos\tOther_cut_pos\n")
+			outfile.write("Enzyme\tEnzyme_seq\tChange_pos\tOther_cut_pos\tChanged_sequence\n")
 			for enzyme in caps_list:
 				outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\n")
 			outfile.write("\ndCAPS cut information for SNP " + snpname + "\n") # change to 1 based
 			for enzyme in dcaps_list:
-				outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + str(enzyme.change_pos) + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\n")
+				outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + str(enzyme.change_pos) + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\t" + enzyme.potential_primer + "\n")
 			outfile.close()
 			return 0
 		# primer3 output file
 		primer3output = directory + "/primer3.output." + snpname
-		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " " + primer3input
-		print "Primer3 command 1st time: ", p3cmd
+		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " -p3_settings_file=" + global_setting_file + " " + primer3input
+		print(("Primer3 command 1st time: ", p3cmd))
 		call(p3cmd, shell=True)
 
 		##########################
@@ -850,9 +791,9 @@ def caps(seqfile):
 	#######################################
 	# write to file
 	outfile = open(out, 'w')
-	outfile.write("index\tproduct_size\ttype\tstart\tend\tdiff_number\t3'differall\tlength\tTm\tGCcontent\tany\t3'\tend_stability\thairpin\tprimer_seq\tReverseComplement\tpenalty\tcompl_any\tcompl_end\tPrimerID\tmatched_chromosomes\n")
+	outfile.write("index\tproduct_size\ttype\tstart\tend\tdiff_number\t3'differall\tlength\tTm\tGCcontent\tany\t3'\tend_stability\thairpin\tprimer_seq\tReverseComplement\tpenalty\tcompl_any\tcompl_end\n")
 	# Get primer list for blast
-	primer_for_blast = {}
+	# primer_for_blast = {}
 	final_primers = {}
 	nL = 0 # left primer count
 	nR = 0 # right primer count
@@ -860,48 +801,27 @@ def caps(seqfile):
 		if pp.product_size != 0:
 			pl = pp.left
 			pr = pp.right
-			if pl.seq not in primer_for_blast:
-				nL += 1
-				pl.name = "L" + str(nL)
-				primer_for_blast[pl.seq] = pl.name # use seq as keys
-			else:
-				pl.name = primer_for_blast[pl.seq]
-			if pr.seq not in primer_for_blast:
-				nR += 1
-				pr.name = "R" + str(nR)
-				primer_for_blast[pr.seq] = pr.name # because a lot of same sequences
-			else:
-				pr.name = primer_for_blast[pr.seq]
 			pp.left = pl
 			pp.right = pr
 			final_primers[i] = pp
-				
-	# blast primers
-	blast_hit = {}
-	outfile_blast = directory + "/primer_blast_out_" + snpname + ".txt"
-	if blast and len(primer_for_blast) > 0:
-		blast_hit = primer_blast(primer_for_blast, outfile_blast) # chromosome hit for each primer
 	# write output file
 	for i, pp in final_primers.items():
-		#varsite = int(i.split("-")[-1]) # variation site
-		#pl = pp.left
-		#pr = pp.right
 		pl = format_primer_seq(pp.left, variation)
 		pr = format_primer_seq(pp.right, variation)
 		# check whether 3' can differ all: not necessary for here, because I only used sites that can differ all.
 		#if varsite in variation:
 		pl.difthreeall = "YES"
 		pr.difthreeall = "YES"
-		outfile.write("\t".join([i, str(pp.product_size), "LEFT", pl.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, pl.name, blast_hit.setdefault(pl.name, "")]) + "\n")
-		outfile.write("\t".join([i, str(pp.product_size), "RIGHT", pr.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, pr.name, blast_hit.setdefault(pr.name, "")]) + "\n")
+		outfile.write("\t".join([i, str(pp.product_size), "LEFT", pl.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end]) + "\n")
+		outfile.write("\t".join([i, str(pp.product_size), "RIGHT", pr.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end]) + "\n")
 	
 	outfile.write("\n\nSites that can differ all for " + snpname + "\n")
 	outfile.write(", ".join([str(x + 1) for x in variation])) # change to 1 based
 	# write CAPS cut information
 	outfile.write("\n\nCAPS cut information for snp " + snpname + "\n") # change to 1 based
-	outfile.write("Enzyme\tEnzyme_seq\tChange_pos\tOther_cut_pos\n")
+	outfile.write("Enzyme\tEnzyme_seq\tChange_pos\tOther_cut_pos\tChanged_sequence\n")
 	for enzyme in dcaps_list + caps_list:
-		outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + str(enzyme.change_pos) + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\n")
+		outfile.write(enzyme.name + "\t" + enzyme.seq + "\t" + str(enzyme.change_pos) + "\t" + ", ".join([str(x + 1) for x in enzyme.allpos]) + "\t" + enzyme.potential_primer + "\n")
 	# close outfile
 	outfile.write("\n\n\n")
 	outfile.close()

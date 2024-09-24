@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#!/bin/bash
+
 # Function to display script usage
 usage() {
     echo
@@ -20,21 +22,26 @@ usage() {
     echo "Options:"
     echo -e "\t-h, --help              Display this help and exit"
     echo -e "\t-v, --verbose           Display text feedback (default option is false)"
+    #echo -e "\t-d, --debug             Enable debug mode (default option is false)"
     echo 
     echo "Arguments:"
-    echo -e "\t-i, --input-file        realpath to a properly formatted, gziped VCF file (.vcf.gz)"
+    echo -e "\t-i, --input-file        realpath to a properly formatted, gzipped VCF file (.vcf.gz)"
     echo -e "\t-o, --output-file       name of the output file (tab-delimited)"
     echo -e "\t-r, --reference-geno    realpath to a reference genome file (.fa)"
     echo -e "\t-s, --snps              a .txt file with a vector of SNP names to subset from the VCF"
+    echo -e "\t-k, --kasp              indicates to design KASP assays"
+    echo -e "\t-c, --caps              indicates to design CAPS assays"    
     echo
     echo "Examples:"
-    echo -e "\t$(realpath $0) -i 'input_file.vcf' -o 'output.txt' -r 'reference_genome.fa'"
+    echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa'"
     exit 1
 }
 
-# Set verbose and debug to false automatically
+# Set verbose, debug, and assay design options to false by default
 verbose=false
 debug=false
+design_kasp=false
+design_caps=false
 
 # Check if there are no arguments
 if [ $# -eq 0 ]; then
@@ -53,7 +60,7 @@ while [[ $# -gt 0 ]]; do
         -o|--output-file)
             output_file=$(realpath "$2")
             shift 2
-            ;;            
+            ;;
         -r|--reference-geno)
             reference_geno=$(realpath "$2")
             shift 2
@@ -62,13 +69,21 @@ while [[ $# -gt 0 ]]; do
             snp_list=$(realpath "$2")
             shift 2
             ;;
+        -k|--kasp)
+            design_kasp=true
+            shift
+            ;;
+        -c|--caps)
+            design_caps=true
+            shift
+            ;;
         -h|--help)
             usage
             ;;
         -d|--debug)
             debug=true
             shift
-            ;;            
+            ;;
         -v|--verbose)
             verbose=true
             shift
@@ -296,13 +311,48 @@ fi
 awk 'NR > 1 {print $3 "," $1 "," $6}' snp_seq_pull_output.txt > snp_seq_pull_output.csv
 
 # Parse polymarker
-python3 "$script_dir/bin/parse_polymarker_input.py" snp_seq_pull_output.csv
+python3 "$script_dir/bin/parse_polymarker_input.py" snp_seq_pull_output.csv > parse_polymarker_input.py.log
 
 # Now blast
 blastn -task blastn -db $reference_geno -query for_blast.fa -outfmt "6 std qseq sseq slen" -num_threads 8 -out blast_out.txt
 
 # Parse the blast output file and output the homelog contigs and flanking ranges
-python3 "$script_dir/bin/getflanking.py" snp_seq_pull_output.csv blast_out.txt temp_range.txt 3
+python3 "$script_dir/bin/getflanking.py" snp_seq_pull_output.csv blast_out.txt temp_range.txt 3 > getflanking.py.log
+
+# Replace - with \t in temp_range.txt
+awk -F '\t' 'BEGIN {OFS = FS} {gsub(/-/, "\t", $3); print}' temp_range.txt > temp_range_mod.txt
+
+# Get the size of the file
+filesize=$(stat -c%s "temp_range.txt")  
+
+# Check if the file size is 0
+if [ "$filesize" -eq 0 ]; then  
+    # Echo issue
+    echo "All the SNPs are bad, possibly too many hits. Please check the stdout." | tee Potential_CAPS_primers.tsv Potential_KASP_primers.tsv > All_alignment_raw.fa
+    
+    # Exit the script with a non-zero status
+    exit 1  
+else
+    # split file for each marker
+    gawk -v OFS='\t' '{ print $2, $3, $4 > "temp_marker_" $1 ".bed" }' temp_range_mod.txt
+fi
+
+# For each marker in temp_marker
+for i in temp_marker*; do 
+    # Extract flanking sequence from database
+    bedtools getfasta -fi $reference_geno -bed $i  -fo flanking_$i.fa
+done
+
+if [ $design_kasp = true ]; then
+    cmd6 = script_path + "getkasp3.py " + max_Tm + " " + max_size + " " + pick_anyway # add blast option
+    print("Step 6: Get KASP primers for each marker command:\n", cmd6)
+    call(cmd6, shell=True)
+fi
+
+if [ $design_caps = true ]; then
+    # Run design
+    
+fi
 
 # Change back to working directory
 cd "$working_directory"

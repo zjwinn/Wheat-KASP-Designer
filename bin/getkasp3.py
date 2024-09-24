@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #  getkasp
 #
+#  Copyright 2016 Junli Zhang <zhjl86@gmail.com>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -26,6 +27,11 @@
 
 # change the input wildcard and the paths of primer3 and muscle accordingly.
 # NOTES: the output primer pair includes the common primer and the primer with SNP A or T, you need to change the 3' nucleartide to get the primer for the other SNP.
+# changes
+# 2022-09-15: add a simple score for auto-selection and only use positions that can diff all homeologs (variations instead of variations2)
+
+# Usage: getkasp3.py maximum_primer_Tm maximum_primer_size whether_to_pick_anyway (1 is yes, 0 is NO)
+# example:  ../bin/getkasp3.py 63 25  0
 
 ### Imported
 from subprocess import call
@@ -33,10 +39,13 @@ import getopt, sys, os, re
 from glob import glob
 import copy
 #########################
+## input
+max_Tm = sys.argv[1] # max Tm, default 63, can be increased in case high GC region
+max_size = sys.argv[2] # max primer size, default 25, can be increased in case low GC region
+pick_anyway = sys.argv[3] # pick primer anyway even if it violates specific constrains
+primer3_path = sys.argv[5] # define the path of primer3
+muscle_path = sys.argv[6] # define the path of muscle
 
-blast = int(sys.argv[1]) # 0 or 1, whether to blast
-max_Tm = sys.argv[2] # max Tm, default 63, can be increased in case high GC region
-reference = sys.argv[3]
 # get all the raw sequences
 raw = glob("flanking_temp_marker*") # All file names start from "flanking"
 raw.sort()
@@ -44,19 +53,17 @@ raw.sort()
 iupac = {"R": "AG", "Y": "TC", "S": "GC", "W": "AT", "K": "TG", "M": "AC"}
 
 #from sys import platform
-def get_software_path(base_path):
-	if sys.platform.startswith('linux'): # linux
-		primer3_path = base_path + "/primer3_core"
-		#muscle_path = base_path + "/muscle"
-		muscle_path = "muscle"
-	elif sys.platform == "win32" or sys.platform == "cygwin": # Windows...
-		primer3_path = base_path + "/primer3_core.exe"
-		#muscle_path = base_path + "/muscle.exe"
-		muscle_path = "muscle.exe"
-	elif sys.platform == "darwin": # MacOSX
-		primer3_path = base_path + "/primer3_core_darwin64"
-		muscle_path = base_path + "/muscle3.8.31_i86darwin64"
-	return primer3_path, muscle_path
+# def get_software_path(base_path):
+# 	if sys.platform.startswith('linux'): # linux
+# 		primer3_path = base_path + "/primer3_core"
+# 		muscle_path = base_path + "/muscle"
+# 	elif sys.platform == "win32" or sys.platform == "cygwin": # Windows...
+# 		primer3_path = base_path + "/primer3_core.exe"
+# 		muscle_path = base_path + "/muscle.exe"
+# 	elif sys.platform == "darwin": # MacOSX
+# 		primer3_path = base_path + "/primer3_core_darwin64"
+# 		muscle_path = base_path + "/muscle3.8.31_i86darwin64"
+# 	return primer3_path, muscle_path
 
 # function to get reverse complement
 def ReverseComplement(seq):
@@ -83,9 +90,8 @@ class Primers(object):
 		self.difthreeall = "NO" # whether 3' site can differ all
 		self.difnum = 0
 		self.direction = ""
-		self.tail = ""
 	def formatprimer(self):
-		formatout = "\t".join(str(x) for x in [self.direction, self.start, self.end, self.difnum, self.difthreeall, self.length, self.tm, self.gc, self.anys, self.three, self.end_stability, self.hairpin, self.tail + self.seq, ReverseComplement(self.seq)])
+		formatout = "\t".join(str(x) for x in [self.direction, self.start, self.end, self.difnum, self.difthreeall, self.length, self.tm, self.gc, self.anys, self.three, self.end_stability, self.hairpin, self.seq, ReverseComplement(self.seq)])
 		return(formatout)
 
 class PrimerPair(object):
@@ -97,6 +103,7 @@ class PrimerPair(object):
 		self.compl_end = "NA"
 		self.penalty = "NA"
 		self.product_size = 0
+		self.score = 0 # a simple score for auto-selection
 
 # simple Tm calculator
 def Tm(seq):
@@ -179,8 +186,8 @@ def get_homeo_seq(fasta, target, ids, align_left, align_right):
 		targetSeq = s1[align_left:(align_right + 1)]
 		homeoSeq = s2[align_left:(align_right + 1)]
 		score1 = score_pairwise(targetSeq, homeoSeq) # score in multiple alignment
-		print ("Targetseq ", targetSeq)
-		print ("homeoSeq  ", homeoSeq)
+		#print "Targetseq ", targetSeq
+		#print "homeoSeq  ", homeoSeq
 		# Get the sequences for comparison
 		indexL, indexR, nL, nR = FindLongestSubstring(targetSeq, homeoSeq)
 		indexL += align_left
@@ -194,17 +201,17 @@ def get_homeo_seq(fasta, target, ids, align_left, align_right):
 		if len(seqR) < nR:
 			seqR = seqR + "-" * (nR - len(seqR))
 		seqk = seqL[::-1][:nL][::-1] + s2[indexL:indexR] + seqR[:nR]
-		print ("primer   :", targetSeq.replace("-",""))
-		print ("seqk     :", seqk)
+		#print "primer   :", targetSeq.replace("-","")
+		#print "seqk     :", seqk
 		score2 = score_pairwise(targetSeq.replace("-",""), seqk)
 		# if there are more than 3 gaps, the Tm usually will be 10 C lower than the perfect match
 		# so just use gap shift 
 		if score1 > score2 and gap_diff(targetSeq, homeoSeq) < 4:
-			print ("homeoSeq but remove all the gaps")
-			print ("targetSeq:", targetSeq)
-			print ("homeoSeq :", homeoSeq)
-			print ("seqk     :", seqk)
-			print ("primer   :", targetSeq.replace("-",""))
+			# print "homeoSeq but remove all the gaps"
+			# print "targetSeq:", targetSeq
+			# print "homeoSeq :", homeoSeq
+			# print "seqk     :", seqk
+			# print "primer   :", targetSeq.replace("-","")
 			seqk = "".join([homeoSeq[i] for i, c in enumerate(targetSeq) if c!='-'])
 		seq2comp.append(seqk)
 		#print k, "\t", seqk
@@ -213,40 +220,6 @@ def get_homeo_seq(fasta, target, ids, align_left, align_right):
 # function to count mismtaches
 def mismatchn (s1, s2):
 	return sum(c1!=c2 for c1,c2 in zip(s1,s2))
-
-# function to blast and parse the output of each primer in the wheat genome
-# depends on function: mismtachn
-def primer_blast(primer_for_blast, outfile_blast):
-	forblast = open("for_blast_primer.fa", 'w') # for blast against the gnome
-	for k, v in primer_for_blast.items(): # k is primer sequence and v is the number
-		forblast.write(">" + v + "\n" + k + "\n")
-	forblast.close()
-	blast_hit = {} # matched chromosomes for primers: less than 2 mismatches in the first 4 bps from 3'
-	### for blast
-	#reference = "/Library/WebServer/Documents/blast/db/nucleotide/161010_Chinese_Spring_v1.0_pseudomolecules.fasta"
-	#reference = "/mnt/h/python_codes/SNP_Primer_Pipeline-master/data/Triticum_aestivum.IWGSC.dna.toplevel.fa"
-	cmd2 = 'blastn -task blastn -db ' + reference + ' -query for_blast_primer.fa -outfmt "6 std qseq sseq qlen slen" -num_threads 3 -word_size 7 -out ' + outfile_blast
-	print ("Step 2: Blast command:\n", cmd2)
-	call(cmd2, shell=True)
-	# process blast file
-	# blast fields
-	# IWB50236_7A_R	IWGSC_CSS_7DS_scaff_3919748	98.718	78	1	0	24	101	4891	4968	1.55e-30	138	CTCATCAAATGATTCAAAAATATCGATRCTTGGCTGGTGTATCGTGCAGACGACAGTTCGTCCGGTATCAACAGCATT	CTCATCAAATGATTCAAAAATATCGATGCTTGGCTGGTGTATCGTGCAGACGACAGTTCGTCCGGTATCAACAGCATT	101 5924
-	# Fields: 
-	# 1: query id, subject id, % identity, alignment length, mismatches, gap opens, 
-	# 7: q. start, q. end, s. start, s. end, evalue, bit score
-	# 13: q. sequence, s. sequence, q. length s. length
-	for line in open(outfile_blast):
-		if line.startswith('#'):
-			continue
-		fields = line.split("\t")
-		query, subject, pct_identity, align_length= fields[:4]
-		qstart, qstop, sstart, sstop = [int(x) for x in fields[6:10]]
-		qseq, sseq = fields[12:14]
-		qlen = int(fields[14])
-		n1 = qlen - qstop
-		if n1 < 2 and mismatchn(qseq[(n1 - 4):], sseq[(n1 - 4):]) + n1 < 2: # if less than 2 mismtaches in the first 4 bases from the 3' end of the primer
-			blast_hit[query] = blast_hit.setdefault(query, "") + ";" + subject + ":" + str(sstart)
-	return blast_hit
 
 # function to extract sequences from a fasta file 
 def get_fasta(infile):
@@ -381,7 +354,7 @@ def parse_primer3output(primer3output, primerpair_to_return):
 				continue
 	return primerpairs
 
-# function to find primer sequence variation site and highlight them in primer sequences
+# function to find primer sequence variation site and highligh them in primer sequences
 def format_primer_seq(primer, variation): # input is a primer object and variation list
 	if primer.start < primer.end:
 		start = primer.start
@@ -394,7 +367,7 @@ def format_primer_seq(primer, variation): # input is a primer object and variati
 		seq = ReverseComplement(primer.seq.lower())
 		#primer_range = range(primer.end - 1, primer.start)
 	
-	primer_range = range(start - 1, end)
+	primer_range = list(range(start - 1, end))
 	var_sites = set(variation).intersection(primer_range)
 	var_sites_relative = [i - start + 1 for i in var_sites]
 	#seq = primer.seq.lower()
@@ -411,26 +384,33 @@ def format_primer_seq(primer, variation): # input is a primer object and variati
 
 def kasp(seqfile):
 	#flanking_temp_marker_IWB1855_7A_R_251.fa
-	print(seqfile)
-	snpname, chrom, allele, pos =re.split("_|\.", seqfile)[3:7]
-	chrom = chrom[0:2] # no arm
+	#snpname, chrom, allele, pos =re.split("_|\.", seqfile)[3:7]
+	#snpname, chrom, allele, pos =re.split("_", seqfile[:-7])[3:7] # [:-7] remove .txt.fa in the file
+	info = re.split("_", seqfile[:-7])
+	snpname = info[3]
+	chrom = "_".join(info[4:-2])
+	allele = info[-2]
+	pos = info[-1]
+	#print "Pos ", pos
 	snp_site = int(pos) - 1 # 0-based
 	getkasp_path = os.path.dirname(os.path.realpath(__file__))
+	global_setting_file = getkasp_path + "/global_settings.txt"
 	directory = "KASP_output"
 	if not os.path.exists(directory):
 		os.makedirs(directory)
 	out = directory + "/selected_KASP_primers_" + snpname + ".txt"
-	target = "2AS" # target sequence name
 	product_min = 50
 	product_max = 250
 	alt_allele = iupac[allele][0] # choose A or T
 	SNP_A, SNP_B = iupac[allele] # SNP 2 alleles
-	print ("SNP_A, SNP_B ", SNP_A, SNP_B)
+	#print "SNP_A, SNP_B ", SNP_A, SNP_B
 	# software path
-	primer3_path, muscle_path = get_software_path(getkasp_path)
+	# primer3_path, muscle_path = get_software_path(getkasp_path)
 	
 	# get target and ids and rename fasta seq names
-	fasta_raw, target, ids = get_fasta2(seqfile, chrom)
+	fasta_raw, target, ids = get_fasta2(seqfile, chrom) # target is the target chromosome, ids are other non-target chromosome name list
+	print(("target ", target))
+	print(("others ", ids))
 	# write the renamed fasta seq to a file
 	seqfile2 = "renamed_" + seqfile
 	out_temp = open(seqfile2, "w")
@@ -445,9 +425,23 @@ def kasp(seqfile):
 	# STEP 0: create alignment file and primer3output file
 	RawAlignFile = "alignment_raw_" + snpname + ".fa"
 	alignmentcmd = muscle_path + " -in " + seqfile2 + " -out " + RawAlignFile + " -quiet"
-	print ("Alignment command: ", alignmentcmd)
+	print(("Alignment command: ", alignmentcmd))
 	call(alignmentcmd, shell=True)
-	
+	settings_common = "PRIMER_TASK=generic" + "\n" + \
+		"SEQUENCE_TEMPLATE=" + seq_template + "\n" + \
+		"PRIMER_PRODUCT_SIZE_RANGE=50-100 100-150 150-250" + "\n" + \
+		"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getkasp_path + "/primer3_config/"  + "\n" + \
+		"PRIMER_MAX_SIZE=" + max_size + "\n" + \
+		"PRIMER_MIN_TM=57.0" + "\n" + \
+		"PRIMER_OPT_TM=60.0" + "\n" + \
+		"PRIMER_MAX_TM=" + max_Tm + "\n" + \
+		"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
+		"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
+		"PRIMER_LIBERAL_BASE=1" + "\n" + \
+		"PRIMER_NUM_RETURN=5"  + "\n" + \
+		"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
+		"PRIMER_PICK_ANYWAY=" + pick_anyway + "\n"
+
 	###############################
 	if not len(ids): # if there is no homeologs found, such as when ploidy is 1
 		# loop to write primer3 input for each variation site
@@ -457,19 +451,6 @@ def kasp(seqfile):
 		# because A and T give lower Tm, so use them as template
 		if alt_allele in "ATat":
 			seq_template = seq_template[:snp_site] +  alt_allele + seq_template[snp_site + 1:]
-		settings_common = "PRIMER_TASK=generic" + "\n" + \
-		"SEQUENCE_TEMPLATE=" + seq_template + "\n" + \
-		"PRIMER_PRODUCT_SIZE_RANGE=50-100 100-150" + "\n" + \
-		"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getkasp_path + "/primer3_config/"  + "\n" + \
-		"PRIMER_MAX_SIZE=25" + "\n" + \
-		"PRIMER_MIN_TM=57.0" + "\n" + \
-		"PRIMER_OPT_TM=60.0" + "\n" + \
-		"PRIMER_MAX_TM=" + max_Tm + "\n" + \
-		"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
-		"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
-		"PRIMER_LIBERAL_BASE=1" + "\n" + \
-		"PRIMER_NUM_RETURN=5"  + "\n" + \
-		"PRIMER_EXPLAIN_FLAG=1"  + "\n"
 		
 		settings = settings_common + \
 		"SEQUENCE_ID=" + snpname + "-left\n" + \
@@ -485,12 +466,12 @@ def kasp(seqfile):
 		p3input.close()
 		# primer3 output file
 		primer3output = directory + "/primer3.output." + snpname
-		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " " + primer3input
-		print ("Primer3 command 1st time: ", p3cmd)
+		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " -p3_settings_file=" + global_setting_file + " " + primer3input
+		print(("Primer3 command 1st time: ", p3cmd))
 		call(p3cmd, shell=True)
 		primerpairs = parse_primer3output(primer3output, 5)
 		# Get primer list for blast
-		primer_for_blast = {}
+		#primer_for_blast = {}
 		final_primers = {}
 		nL = 0 # left primer count
 		nR = 0 # right primer count
@@ -498,42 +479,19 @@ def kasp(seqfile):
 			if pp.product_size != 0:
 				pl = pp.left
 				pr = pp.right
-				if pl.seq not in primer_for_blast:
-					nL += 1
-					pl.name = "L" + str(nL)
-					primer_for_blast[pl.seq] = pl.name # use seq as keys
-				else:
-					pl.name = primer_for_blast[pl.seq]
-				if pr.seq not in primer_for_blast:
-					nR += 1
-					pr.name = "R" + str(nR)
-					primer_for_blast[pr.seq] = pr.name # because a lot of same sequences
-				else:
-					pr.name = primer_for_blast[pr.seq]
 				pp.left = pl
 				pp.right = pr
 				final_primers[i] = pp
 	else: # if there are homeolog sequences	
 		########################
-		
-		
-		########################
 		# read alignment file
 		fasta = get_fasta(RawAlignFile)
 		# get the variaiton site among sequences
-		#ids = [] # all other sequence names
-		#for kk in fasta.keys():
-			#key_chr = kk.split("_")[2] # sequence chromosome name
-			#if chrom in key_chr or key_chr in chrom: # 3B contig names do not have chromosome arm
-				#target = kk
-			#else:
-				#ids.append(kk)
-				
-		print ("The target: ", target)
-		print ("The other groups: ", ids)
+		print(("The target: ", target))
+		print(("The other groups: ", ids))
 
 		alignlen = len(fasta[target])
-		print ("Alignment length: ", alignlen)
+		print(("Alignment length: ", alignlen))
 		
 		# get the target ID template base coordinate in the alignment
 		t2a = {} # template to alignment
@@ -546,8 +504,8 @@ def kasp(seqfile):
 			t2a[i - ngap] = i
 			a2t[i] = i - ngap
 
-		print ("last key of t2a", i - ngap)
-		print ("last key of a2t", i)
+		print(("last key of t2a", i - ngap))
+		print(("last key of a2t", i))
 		
 		seq_template = fasta[target].replace("-","") # remove all gaps
 
@@ -558,7 +516,7 @@ def kasp(seqfile):
 		gap_left_target = len(fasta[target]) - len(fasta[target].lstrip('-'))
 		gap_left = max([len(v) - len(v.lstrip('-')) for k, v in fasta.items()])
 		gap_right = min([len(v.rstrip('-')) for k, v in fasta.items()])
-		print ("gap_left_target, gap_left and gap_right: ", gap_left_target, gap_left, gap_right)
+		print(("gap_left_target, gap_left and gap_right: ", gap_left_target, gap_left, gap_right))
 		
 		diffarray = {} # a list of 0 or 1: the same as or different from the site in each sequences of ids
 		#for i in range(alignlen):
@@ -599,8 +557,8 @@ def kasp(seqfile):
 				if pos_template not in variation2: # in case multiple gaps
 					variation2.append(pos_template)
 		
-		print ("Sites that can differ all\n", variation)
-		print ("\nSites that can differ at least 1\n", variation2)
+		print(("Sites that can differ all\n", variation))
+		print(("\nSites that can differ at least 1\n", variation2))
 		#print "\nKeys of diffarray: ", diffarray.keys()
 		#############
 		# loop to write primer3 input for each variation site
@@ -611,7 +569,7 @@ def kasp(seqfile):
 		if alt_allele in "ATat":
 			seq_template = seq_template[:snp_site] +  alt_allele + seq_template[snp_site + 1:]
 
-		for i in variation2:
+		for i in variation: # use variation2 if you want semi-specific primers.
 			if i == snp_site:
 				continue
 			elif i < snp_site:
@@ -622,20 +580,8 @@ def kasp(seqfile):
 				right_end = i
 			if right_end - left_end > product_max - 35: # suppose both primers are 18 bp
 				continue
-			settings = "PRIMER_TASK=generic" + "\n" + \
+			settings = settings_common + \
 			"SEQUENCE_ID=" + snpname + "-" + str(i+1) + "\n" + \
-			"SEQUENCE_TEMPLATE=" + seq_template + "\n" + \
-			"PRIMER_PRODUCT_SIZE_RANGE=50-250" + "\n" + \
-			"PRIMER_THERMODYNAMIC_PARAMETERS_PATH=" + getkasp_path + "/primer3_config/"  + "\n" + \
-			"PRIMER_MAX_SIZE=25" + "\n" + \
-			"PRIMER_MIN_TM=57.0" + "\n" + \
-			"PRIMER_OPT_TM=60.0" + "\n" + \
-			"PRIMER_MAX_TM=" + max_Tm + "\n" + \
-			"PRIMER_PAIR_MAX_DIFF_TM=6.0" + "\n" + \
-			"PRIMER_FIRST_BASE_INDEX=1" + "\n" + \
-			"PRIMER_LIBERAL_BASE=1" + "\n" + \
-			"PRIMER_NUM_RETURN=5"  + "\n" + \
-			"PRIMER_EXPLAIN_FLAG=1"  + "\n" + \
 			"SEQUENCE_FORCE_LEFT_END=" + str(left_end + 1) + "\n" + \
 			"SEQUENCE_FORCE_RIGHT_END=" + str(right_end + 1) + "\n" + \
 			"="
@@ -645,18 +591,19 @@ def kasp(seqfile):
 
 		# primer3 output file
 		primer3output = directory + "/primer3.output." + snpname
-		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " " + primer3input
-		print ("Primer3 command 1st time: ", p3cmd)
+		p3cmd = primer3_path + " -default_version=2 -output=" + primer3output + " -p3_settings_file=" + global_setting_file + " " + primer3input
+		print(("Primer3 command 1st time: ", p3cmd))
 		call(p3cmd, shell=True)
 		primerpairs = parse_primer3output(primer3output, 1)
-		print ("primerpairs length ", len(primerpairs))
+		print(("primerpairs length ", len(primerpairs)))
 		####################################
 		# Get primer list for blast
-		primer_for_blast = {}
+		#primer_for_blast = {}
 		final_primers = {} # final primers for output
 		nL = 0 # left primer count
 		nR = 0 # right primer count
 		for i, pp in primerpairs.items():
+			dif3all = 0 # whether common primer can diff all in the 3' end
 			varsite = int(i.split("-")[-2]) - 1 # variation site
 			#print "varsite", varsite
 			if pp.product_size != 0:
@@ -666,44 +613,35 @@ def kasp(seqfile):
 				if varsite in variation:
 					pl.difthreeall = "YES"
 					pr.difthreeall = "YES"
+					dif3all = 1
 				if varsite < snp_site:
 					pc = pl # pc is the common primer
+					# print "pc = pl"
 					# rr: range to check; only check 10 bases from 3' end
-					rr = range(max(pc.end - 10,gap_left), pc.end) # pc.end is 1 based, so change to 0 based.
+					rr = list(range(max(pc.end - 10,gap_left), pc.end)) # pc.end is 1 based, so change to 0 based.
 				else:
 					pc = pr
-					rr = range(pc.end -1, min(pc.end + 9, len(seq_template) - 20)) # rr should be within the keys of diffarray, which is from gap_left to gap_right
+					# print "pc = pr"
+					rr = list(range(pc.end -1, min(pc.end + 9, len(seq_template) - 20))) # rr should be within the keys of diffarray, which is from gap_left to gap_right
+				# print "gap_left ", gap_left
+				# print "len(seq_template) ", len(seq_template)
+				# print "pc.end ", pc.end
+				# print "rr ", rr
+
+				# calculate a simple score for selection: only consider product size, 3'diff all, and Tm diff, diff number
+				pp.score = dif3all*5.0 + 150.0/pp.product_size + pc.difnum/10.0 - abs(pl.tm - pr.tm)/10.0
+
 				# sum of all the variation in each site
 				aa = [sum(x) for x in zip(*(diffarray[k] for k in rr))]
-				print ("aa ", aa)
+				#print "aa ", aa
 				if min(aa) > 0: # if common primer can differ all
-					if pl.seq not in primer_for_blast:
-						nL += 1
-						pl.name = "L" + str(nL)
-						primer_for_blast[pl.seq] = pl.name # use seq as keys
-					else:
-						pl.name = primer_for_blast[pl.seq]
-					if pr.seq not in primer_for_blast:
-						nR += 1
-						pr.name = "R" + str(nR)
-						primer_for_blast[pr.seq] = pr.name # because a lot of same sequences
-					else:
-						pr.name = primer_for_blast[pr.seq]
 					pp.left = pl
 					pp.right = pr
 					final_primers[i] = pp
 	#################################################	
 	# write to file
 	outfile = open(out, 'w')
-	outfile.write("index\tproduct_size\ttype\tstart\tend\tvariation number\t3'diffall\tlength\tTm\tGCcontent\tany\t3'\tend_stability\thairpin\tprimer_seq\tReverseComplement\tpenalty\tcompl_any\tcompl_end\tPrimerID\tmatched_chromosomes\n")
-	# blast primers
-	blast_hit = {}
-	outfile_blast = directory + "/primer_blast_out_" + snpname + ".txt"
-	# tails
-	FAM = "GAAGGTGACCAAGTTCATGCT"
-	VIC = "GAAGGTCGGAGTCAACGGATT"
-	if blast and len(primer_for_blast) > 0:
-		blast_hit = primer_blast(primer_for_blast, outfile_blast) # chromosome hit for each primer
+	outfile.write("index\tproduct_size\ttype\tstart\tend\tvariation number\t3'diffall\tlength\tTm\tGCcontent\tany\t3'\tend_stability\thairpin\tprimer_seq\tReverseComplement\tpenalty\tcompl_any\tcompl_end\tscore\n")			
 	# write output file
 	for i, pp in final_primers.items():
 		pl = format_primer_seq(pp.left, variation)
@@ -726,11 +664,9 @@ def kasp(seqfile):
 			pA.seq = pA.seq[:-1] + ReverseComplement(SNP_A)
 			pB.seq = pB.seq[:-1] + ReverseComplement(SNP_B)
 			pC = pl
-		pA.tail = FAM
-		pB.tail = VIC
-		outfile.write("\t".join([i + "-" + SNP_A, str(pp.product_size), pA.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, pA.name, blast_hit.setdefault(pA.name, "")]) + "\n")
-		outfile.write("\t".join([i + "-" + SNP_B, str(pp.product_size), pB.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, pB.name, blast_hit.setdefault(pB.name, "")]) + "\n")
-		outfile.write("\t".join([i + "-Common", str(pp.product_size),   pC.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, pC.name, blast_hit.setdefault(pC.name, "")]) + "\n")
+		outfile.write("\t".join([i + "-Allele-" + SNP_A, str(pp.product_size), pA.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, str(pp.score)]) + "\n")
+		outfile.write("\t".join([i + "-Allele-" + SNP_B, str(pp.product_size), pB.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, str(pp.score)]) + "\n")
+		outfile.write("\t".join([i + "-Common", str(pp.product_size),   pC.formatprimer(), pp.penalty, pp.compl_any, pp.compl_end, str(pp.score)]) + "\n")
 
 	outfile.write("\n\nSites that can differ all for " + snpname + "\n")
 	outfile.write(", ".join([str(x + 1) for x in variation])) # change to 1 based
@@ -741,4 +677,4 @@ def kasp(seqfile):
 
 for ff in raw:
 	kasp(ff)
-	
+

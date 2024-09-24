@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #  getkasp
@@ -23,27 +23,22 @@
 #
 
 # example
-# ./getflanking.py for_polymarker.csv blast_out.tsv temp_range.txt 3
+# ./getflanking.py for_polymarker.csv blast_out.tsv temp_range.txt
 
 ### Imported
 import sys
 
-# i'll assume it's tab-delimited...
-# and est is the query.
 polymarker_input = sys.argv[1]
 blast_file = sys.argv[2] # this is a special blast file with two columns in the last: qseq and sseq (query sequence and subject sequenc)
 outfile = sys.argv[3]
-genome_number =  int(sys.argv[4])
-if genome_number not in [1, 2, 3]:
-	sys.exit("Genome number need to be either 1, 2, or 3")
-
-genomes = "ABD"
-genomes = genomes[:genome_number] + "n" # final genomes + chrUn
 
 # get snp position
 snp_pos = {}
 for line in open(polymarker_input):
-	snp, chrom, seq = line.strip().replace(" ","").split(",") # in case there are spaces
+	line = line.strip()
+	if not line:
+		continue
+	snp, chrom, seq = line.replace(" ","").split(",") # in case there are spaces
 	snp = snp.replace("_", "-") # in case there is already "_" in the snp name
 	seq = seq.strip() # in case there are spaces in the input file
 	snp_pos[snp] = seq.find("[") + 1
@@ -73,26 +68,20 @@ range_list = [] # range list for each subject
 # 7: q. start, q. end, s. start, s. end, evalue, bit score
 # 13: q. sequence, s. sequence, s. length
 snp_size_list = [] # max alignment length for each snp
+top_hit = {} # get top hit for each query, in case the query chromosome name did not show up in subjects
 for line in open(blast_file):
 	if line.startswith('#'):
 		continue
 	fields = line.split("\t")
 	query, subject = fields[:2]
-	snp, qchrom = query.split("_")[0:2] # snp name, query chromosome name
-	qchrom = qchrom[0:2] # no arm for pseudomolecule blast
-	#schrom = subject.split("_")[2] # subject chromosome name with arm
-	schrom = subject[-2:] # chr6A as in the pseudomolecule. No chromosome arm
-	#print qchrom, schrom
-	if schrom[1] not in genomes:
-		continue
-	#pct_identity = float(fields[2]) # big gaps cause low identity
+	snp, qchrom, allele = query.split("_") # snp name, query chromosome name
+	schrom = subject
 	pct_identity = 100 - (float(fields[4]) + float(fields[5])) / float(fields[3]) * 100 # to avoid big gaps
 	align_length = int(fields[3])
 	if snp not in snp_size_list:
 		snp_size_list.append(snp)
 		min_align = max(50, align_length * 0.9) # to filter out those not very good alignment, since I will blast anyway later.
 	# only get min-identity 90% and at least 50 bp alignment
-	# print "snp, min_align", snp, min_align
 	if pct_identity > 88 and align_length > min_align:
 		qstart, qstop, sstart, sstop = [int(x) for x in fields[6:10]]
 		qseq, sseq = fields[12:14]
@@ -130,26 +119,34 @@ for line in open(blast_file):
 	
 		if qchrom == schrom:
 			snpinfo[query] = query + "_" + str(pos2)
-		#flanking[query + "-" + subject] = "\t".join([subject, str(up) + "-" + str(down), strand])
-		#flanking[query + "-" + subject + "-" + str(sstart)] = "\t".join([subject, str(up) + "-" + str(down), strand])
 		snp_list.append(query)
 		range_list.append("\t".join([subject, str(up) + "-" + str(down), strand]))
+		if query not in top_hit:
+			top_hit[query] = '_'.join([snp,subject,allele,str(pos2)]) # the best hit for each query
 
-
-# Output snp list
-print("SNP list:", snp_list)  # Show all SNPs processed
-print("SNP info:", snpinfo)    # Show the contents of snpinfo
+# find out which has too many hits
+print("snpinfo", snpinfo)
+print("snp_list", snp_list)
+print("top_hit", top_hit)
+max_hit = 6
+from collections import Counter
+ct = Counter(snp_list) # count of each snp hits
+for i in ct:
+	print((i, "has hits", ct[i]))
 
 # output
 out = open(outfile, "w")
 
 for i in range(len(snp_list)):
 	snp = snp_list[i]
+	if ct[snp] > max_hit:
+		#print snp, ct[snp]
+		continue
 	rg = range_list[i]
-	out.write(snpinfo[snp] + "\t" + rg + "\n")
+	if snp not in snpinfo: # snp has no hit on the target chromosome
+		print("Warning: no hits were found on target chromosome for SNP ", snp, "!! Use the first hit as target chromosome!!")
+		out.write(top_hit[snp] + "\t" + rg + "\n")
+	else:
+		out.write(snpinfo[snp] + "\t" + rg + "\n")
 
-#for k, v in flanking.items():
-#	k2 = k.split("-")[0] # key for snpinfo
-#	out.write(snpinfo[k2] + "\t" + v + "\n")
-	
 out.close()

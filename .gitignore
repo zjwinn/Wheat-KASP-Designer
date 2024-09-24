@@ -1,2 +1,5 @@
 # Ignore workspace for vscode
 Wheat-KASP-Designer.code-workspace
+
+# Ignore the temp debug file
+/test_files/tmp/
