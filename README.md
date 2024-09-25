@@ -8,7 +8,7 @@ This script is based on the foundational work done in the [SNP Primer Pipeline 2
 
 ## Downloading and Execution
 
-On a linux system with git and conda installed, use the following commands to clone and run the following batch file:
+On a linux system with git and conda installed, use the following commands to clone and run the shell script:
 
 ```bash
 # Navigate to where you want to clone to
