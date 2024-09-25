@@ -1,0 +1,16 @@
+index	product_size	type	start	end	variation number	3'diffall	length	Tm	GCcontent	any	3'	end_stability	hairpin	primer_seq	ReverseComplement	penalty	compl_any	compl_end	score
+S1A-3793296-right-0-Allele-A	73	RIGHT	520	501	0	NO	20	59.174	55.0	0.0	0.0	4.96	0.0	ggttcaagatggcaatgggT	Acccattgccatcttgaacc	1.004947	11.26	2.21	0
+S1A-3793296-right-0-Allele-G	73	RIGHT	520	501	0	NO	20	59.174	55.0	0.0	0.0	4.96	0.0	ggttcaagatggcaatgggC	Gcccattgccatcttgaacc	1.004947	11.26	2.21	0
+S1A-3793296-right-0-Common	73	LEFT	448	467	0	NO	20	60.179	60.0	0.0	0.0	0.98	0.0	cccatccccgtcccctaata	tattaggggacggggatggg	1.004947	11.26	2.21	0
+S1A-6370123-right-0-Allele-T	81	RIGHT	524	501	0	NO	24	57.023	33.333	0.0	0.0	3.01	0.0	tttgagcctttttagaagtggaaA	Tttccacttctaaaaaggctcaaa	7.006768	8.09	0.00	0
+S1A-6370123-right-0-Allele-C	81	RIGHT	524	501	0	NO	24	57.023	33.333	0.0	0.0	3.01	0.0	tttgagcctttttagaagtggaaG	Cttccacttctaaaaaggctcaaa	7.006768	8.09	0.00	0
+S1A-6370123-right-0-Common	81	LEFT	444	463	0	NO	20	59.97	55.0	0.5	0.0	3.02	38.26	gccacggctgcattattcag	ctgaataatgcagccgtggc	7.006768	8.09	0.00	0
+S1A-3618173-left-0-Allele-A	84	LEFT	477	501	0	NO	25	59.405	40.0	9.33	0.0	1.63	37.45	tcttctgacctacgcaagaagataA	Ttatcttcttgcgtaggtcagaaga	5.638291	0.00	0.00	0
+S1A-3618173-left-0-Allele-T	84	LEFT	477	501	0	NO	25	59.405	40.0	9.33	0.0	1.63	37.45	tcttctgacctacgcaagaagataT	Atatcttcttgcgtaggtcagaaga	5.638291	0.00	0.00	0
+S1A-3618173-left-0-Common	84	RIGHT	560	541	0	NO	20	60.044	55.0	11.47	9.22	3.84	36.32	cacgagaattgagcgcatcg	cgatgcgctcaattctcgtg	5.638291	0.00	0.00	0
+S1A-6345794-left-0-Allele-T	64	LEFT	480	501	0	NO	22	59.902	50.0	0.0	0.0	2.9	38.3	tctcgctcgttgttaggagatT	Aatctcctaacaacgagcgaga	2.436443	0.00	0.00	0
+S1A-6345794-left-0-Allele-G	64	LEFT	480	501	0	NO	22	59.902	50.0	0.0	0.0	2.9	38.3	tctcgctcgttgttaggagatG	Catctcctaacaacgagcgaga	2.436443	0.00	0.00	0
+S1A-6345794-left-0-Common	64	RIGHT	543	524	0	NO	20	59.661	60.0	0.0	0.0	4.3	38.49	tcaaggtactcccctctccc	gggagaggggagtaccttga	2.436443	0.00	0.00	0
+S1A-6345794-right-0-Allele-T	53	RIGHT	519	501	0	NO	19	60.38	63.158	0.0	0.0	4.61	0.0	ctgcccccaaatctccacA	Tgtggagatttgggggcag	1.834173	0.00	0.00	0
+S1A-6345794-right-0-Allele-G	53	RIGHT	519	501	0	NO	19	60.38	63.158	0.0	0.0	4.61	0.0	ctgcccccaaatctccacC	Ggtggagatttgggggcag	1.834173	0.00	0.00	0
+S1A-6345794-right-0-Common	53	LEFT	467	486	0	NO	20	59.546	55.0	0.0	0.0	4.93	36.25	catctcgaaccactctcgct	agcgagagtggttcgagatg	1.834173	0.00	0.00	0

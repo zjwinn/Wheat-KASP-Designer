@@ -31,7 +31,7 @@ usage() {
     echo -e "\t-m, --max-temp          a maximum temperature indicated in Celsius"
     echo -e "\t-p, --max-price         a maximum price in USD"
     echo -e "\t-x, --max-size          a maximum size in base pairs" 
-    echo -e "\t-r, --keep-anyway       indicates to keep markers even when failing filters"    
+    echo -e "\t-a, --keep-anyway       indicates to keep markers even when failing filters"    
     echo
     echo "Examples:"
     echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa'"
@@ -46,7 +46,7 @@ design_caps=false
 max_temp=""
 max_price=""
 max_size=""
-keep_anyway=0
+pick_anyway=0
 
 # Check if there are no arguments
 if [ $# -eq 0 ]; then
@@ -94,7 +94,7 @@ while [[ $# -gt 0 ]]; do
             max_size="$2"
             shift 2
             ;;
-        -r|--keep-anyway)
+        -a|--keep-anyway)
             keep_anyway=1
             shift
             ;;
@@ -118,6 +118,7 @@ done
 
 # Enable debug mode if debug is true
 if [ "$debug" = true ]; then
+    echo
     echo "######################################################"
     echo "### WARNING: DEBUG ACTIVE AND MAY MESS UP OUTPUTS! ###"
     echo "######################################################"
@@ -125,19 +126,19 @@ fi
 
 # Check if required options are provided
 if [ -z "$input_file" ] || [ -z "$output_file" ] || [ -z "$reference_geno" ]; then
-    echo "Error: Input file, output file, and reference genome file are required." >&2
+    echo "*** Error: Input file, output file, and reference genome file are required." >&2
     usage
 fi
 
 # Check if input file exists
 if [ ! -f "$input_file" ]; then
-    echo "Error: Input file '$input_file' not found." >&2
+    echo "*** Error: Input file '$input_file' not found." >&2
     usage
 fi
 
 # Check if reference genome
 if [ ! -f "$reference_geno" ]; then
-    echo "Error: Input file '$reference_geno' not found." >&2
+    echo "*** Error: Input file '$reference_geno' not found." >&2
     usage
 fi
 
@@ -186,19 +187,15 @@ fi
 if [ "$debug" = false ]; then
     # Define a cleanup function
     cleanup() {
-        # Display message
-        if [ "$verbose" = true ]; then
-            echo
-            echo "### Cleaning up temporary directory: $tmp_dir"
-        fi
-        
         # Remove directory
         rm -rf "$tmp_dir"
 
         # Display message
         if [ "$verbose" = true ]; then
             echo
-            echo "### Temporary directory cleaned up. Exiting script."
+            echo "#######################################################"
+            echo "### Temporary directory cleaned up. Exiting script. ###"
+            echo "#######################################################"
         fi
     }
 
@@ -228,7 +225,9 @@ if [ ! -f "$reference_geno_location/${reference_geno_file}.nal" ] && \
     # Display message
     if [ "$verbose" = true ]; then
         echo
-        echo "### BLAST database for the reference genome does not exist. Making database."
+        echo "##################################################################################"
+        echo "### BLAST database for the reference genome does not exist. Making database... ###"
+        echo "##################################################################################"
     fi
 
     # Make the database
@@ -239,7 +238,9 @@ if [ ! -f "$reference_geno_location/${reference_geno_file}.fai" ]; then
     # Display message
     if [ "$verbose" = true ]; then
         echo
-        echo "### Genome index file does not exist. Making index."
+        echo "#######################################################"
+        echo "### Genome index file does not exist. Making index... #"
+        echo "#######################################################"
     fi
 
     # Make the database
@@ -251,7 +252,9 @@ if [ -z "$snp_list" ]; then
     # Display message
     if [ "$verbose" = true ]; then
         echo
-        echo "### No SNP list detected. Subsetting to only biallelic SNP."
+        echo "###############################################################"
+        echo "### No SNP list detected. Subsetting to only biallelic SNP... #"
+        echo "###############################################################"        
     fi
 
     # Run vcftools to subset SNP
@@ -265,7 +268,9 @@ else
     # Display message
     if [ "$verbose" = true ]; then
         echo
-        echo "### SNP list detected. Subsetting to SNPs indicated."
+        echo "########################################################"          
+        echo "### SNP list detected. Subsetting to SNPs indicated... #"
+        echo "########################################################"
     fi
 
     # Run vcftools to subset SNP
@@ -298,6 +303,15 @@ if [ -n "$check1" ]; then
 
     # Move the temporary file back to the original file
     mv temp_file snp_seq_pull_input.txt
+fi
+
+# Check verbose
+if [ "$verbose" = true ]; then
+    # Print
+    echo
+    echo "##################################"
+    echo "# Generating polymarker input... #"
+    echo "##################################"
 fi
 
 # Now get the sequences using snp_sequence_puller.sh
@@ -334,8 +348,25 @@ awk 'NR > 1 {print $3 "," $1 "," $6}' snp_seq_pull_output.txt > snp_seq_pull_out
 # Parse polymarker
 python3 "$script_dir/bin/parse_polymarker_input.py" snp_seq_pull_output.csv > parse_polymarker_input.py.log
 
+# Check verbose
+if [ "$verbose" = true ]; then
+    # Print
+    echo "###############################"
+    echo "# BLASTing input sequences... #"
+    echo "###############################"
+fi
+
 # Now blast
 blastn -task blastn -db $reference_geno -query for_blast.fa -outfmt "6 std qseq sseq slen" -num_threads 8 -out blast_out.txt
+
+# Check verbose
+if [ "$verbose" = true ]; then
+    # Print
+    echo
+    echo "###########################"
+    echo "# Parsing BLAST output... #"
+    echo "###########################"
+fi
 
 # Parse the blast output file and output the homelog contigs and flanking ranges
 python3 "$script_dir/bin/getflanking.py" snp_seq_pull_output.csv blast_out.txt temp_range.txt 3 > getflanking.py.log
@@ -364,18 +395,123 @@ for i in temp_marker*; do
     bedtools getfasta -fi $reference_geno -bed $i  -fo flanking_$i.fa
 done
 
+# Check to make KASP 
 if [ $design_kasp = true ]; then
+    # Check verbose
+    if [ "$verbose" = true ]; then
+        # Print
+        echo
+        echo "###############################"
+        echo "# Designing potential KASP... #"
+        echo "###############################"
+    fi    
+    
     # Run design
-    python3 "$script_dir/bin/getkasp3.py" $max_temp $max_size $pick_anyway > getkasp3.py.log
+    python3 "$script_dir/bin/getkasp3.py" "$max_temp" "$max_size" "$pick_anyway" > getkasp3.py.log
 fi
 
+# Check to make CAPS
 if [ $design_caps = true ]; then
+    # Check verbose
+    if [ "$verbose" = true ]; then
+        # Print
+        echo
+        echo "###############################"
+        echo "# Designing potential CAPS... #"
+        echo "###############################"
+    fi    
+    
     # Run design
-    python3 "$script_dir/bin/getCAPS.py" $max_temp $max_size $pick_anyway > getCAPS.py.log
+    python3 "$script_dir/bin/getCAPS.py" "$max_price" "$max_temp" "$max_size" "$pick_anyway" > getCAPS.py.log
+fi
+
+# Define the expected number of columns
+expected_columns=20
+
+# Function to filter files based on column count and concatenate them
+concat_filtered_files() {
+    local input_dir=$1
+    local output_file=$2
+    local file_pattern=$3
+
+    if [ "$debug" = true ]; then
+        echo
+        echo "#############################"
+        echo "# File parsing script debug #"
+        echo "#############################"
+        echo 
+        echo "### Processing files in directory: $input_dir"
+        echo "### Looking for files matching pattern: $file_pattern"
+        echo
+    fi
+
+    # Get the header from the first file and store it in the output file
+    first_file=$(find $input_dir -name "$file_pattern*" | head -n 1)
+    
+    if [ "$debug" = true ]; then
+        echo "### Using header from file: $first_file"
+        echo
+    fi
+
+    head -n 1 "$first_file" > $output_file
+
+    # Loop through files in the directory
+    find $input_dir -name "$file_pattern*" | while read file; do
+        if [ "$debug" = true ]; then
+            echo "#### Processing file: $file"
+            echo
+        fi
+
+        # Skip the header in each file and filter rows based on the expected number of columns
+        tail -n +2 "$file" | while read line; do
+            # Print the line and count the number of fields (columns)
+            num_fields=$(echo "$line" | awk -F'\t' '{print NF}')
+
+            if [ "$debug" = true ]; then
+                echo "### Line: $line"
+                echo "### Number of columns: $num_fields"
+            fi
+
+            # If the line has the expected number of columns, append it to the output file
+            if [ "$num_fields" -eq "$expected_columns" ]; then
+                echo "$line" >> $output_file
+                if [ "$debug" = true ]; then echo; fi
+            else
+                if [ "$debug" = true ]; then
+                    echo "### Skipping line due to incorrect number of columns."
+                    echo
+                fi
+            fi
+        done
+    done
+}
+
+# Check if there is KASP output and concatenate if there is (silently)
+if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
+    concat_filtered_files "./KASP_output" "$working_directory/Potential_KASP_primers.tsv" "selected_KASP_primers"
+fi
+
+# Check if there is CAPS output and concatenate if there is (silently)
+if [ $(find ./CAPS_output/ -name "selected_CAPS_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
+    concat_filtered_files "./CAPS_output" "$working_directory/Potential_CAPS_primers.tsv" "selected_CAPS_primers"
 fi
 
 # Change back to working directory
 cd "$working_directory"
+
+# Check verbose
+if [ "$verbose" = true ]; then
+    # Print
+    echo
+    echo "######################"
+    echo "# Pipeline complete! #" 
+    echo "######################"
+    echo
+    echo "##############################################################################"
+    echo "# Check for 'Potential_KASP_primers.tsv' and/or 'Potential_CAPS_primers.tsv' #" 
+    echo "# in current working directory.                                              #"
+    echo "##############################################################################"
+fi  
 
 # Exit without error
 exit 0
