@@ -43,8 +43,6 @@ import copy
 max_Tm = sys.argv[1] # max Tm, default 63, can be increased in case high GC region
 max_size = sys.argv[2] # max primer size, default 25, can be increased in case low GC region
 pick_anyway = sys.argv[3] # pick primer anyway even if it violates specific constrains
-primer3_path = sys.argv[4] # define the path of primer3
-muscle_path = sys.argv[5] # define the path of muscle
 
 # get all the raw sequences
 raw = glob("flanking_temp_marker*") # All file names start from "flanking"
@@ -53,17 +51,17 @@ raw.sort()
 iupac = {"R": "AG", "Y": "TC", "S": "GC", "W": "AT", "K": "TG", "M": "AC"}
 
 #from sys import platform
-# def get_software_path(base_path):
-# 	if sys.platform.startswith('linux'): # linux
-# 		primer3_path = base_path + "/primer3_core"
-# 		muscle_path = base_path + "/muscle"
-# 	elif sys.platform == "win32" or sys.platform == "cygwin": # Windows...
-# 		primer3_path = base_path + "/primer3_core.exe"
-# 		muscle_path = base_path + "/muscle.exe"
-# 	elif sys.platform == "darwin": # MacOSX
-# 		primer3_path = base_path + "/primer3_core_darwin64"
-# 		muscle_path = base_path + "/muscle3.8.31_i86darwin64"
-# 	return primer3_path, muscle_path
+def get_software_path(base_path):
+	if sys.platform.startswith('linux'): # linux
+		primer3_path = base_path + "/primer3_core"
+		muscle_path = base_path + "/muscle"
+	elif sys.platform == "win32" or sys.platform == "cygwin": # Windows...
+		primer3_path = base_path + "/primer3_core.exe"
+		muscle_path = base_path + "/muscle.exe"
+	elif sys.platform == "darwin": # MacOSX
+		primer3_path = base_path + "/primer3_core_darwin64"
+		muscle_path = base_path + "/muscle3.8.31_i86darwin64"
+	return primer3_path, muscle_path
 
 # function to get reverse complement
 def ReverseComplement(seq):
@@ -405,7 +403,7 @@ def kasp(seqfile):
 	SNP_A, SNP_B = iupac[allele] # SNP 2 alleles
 	#print "SNP_A, SNP_B ", SNP_A, SNP_B
 	# software path
-	# primer3_path, muscle_path = get_software_path(getkasp_path)
+	primer3_path, muscle_path = get_software_path(getkasp_path)
 	
 	# get target and ids and rename fasta seq names
 	fasta_raw, target, ids = get_fasta2(seqfile, chrom) # target is the target chromosome, ids are other non-target chromosome name list
