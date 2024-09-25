@@ -22,9 +22,6 @@ Display text feedback (default option is false).
 -i, --input-file
 Real path to a properly formatted, gzipped VCF file (.vcf.gz).
 
--o, --output-file
-Name of the output file (tab-delimited).
-
 -r, --reference-geno
 Real path to a reference genome file (.fa).
 
