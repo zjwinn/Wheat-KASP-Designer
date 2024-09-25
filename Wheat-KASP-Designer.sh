@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#!/bin/bash
-
 # Function to display script usage
 usage() {
     echo
@@ -16,13 +14,12 @@ usage() {
     echo
     echo "Description:"
     echo -e "\tThis script will take a known reference genome (.fa) and variant calling format (VCF) file"
-    echo -e "\tand report back subgenome specific KASP markers for wheat (Triticum aestivum L.)"
+    echo -e "\tand report back subgenome-specific KASP markers for wheat (Triticum aestivum L.)"
     echo -e "\twith some metric for quality assessment."
     echo 
     echo "Options:"
     echo -e "\t-h, --help              Display this help and exit"
     echo -e "\t-v, --verbose           Display text feedback (default option is false)"
-    #echo -e "\t-d, --debug             Enable debug mode (default option is false)"
     echo 
     echo "Arguments:"
     echo -e "\t-i, --input-file        realpath to a properly formatted, gzipped VCF file (.vcf.gz)"
@@ -30,18 +27,26 @@ usage() {
     echo -e "\t-r, --reference-geno    realpath to a reference genome file (.fa)"
     echo -e "\t-s, --snps              a .txt file with a vector of SNP names to subset from the VCF"
     echo -e "\t-k, --kasp              indicates to design KASP assays"
-    echo -e "\t-c, --caps              indicates to design CAPS assays"    
+    echo -e "\t-c, --caps              indicates to design CAPS assays"
+    echo -e "\t-m, --max-temp          a maximum temperature indicated in Celsius"
+    echo -e "\t-p, --max-price         a maximum price in USD"
+    echo -e "\t-x, --max-size          a maximum size in base pairs" 
+    echo -e "\t-r, --keep-anyway       indicates to keep markers even when failing filters"    
     echo
     echo "Examples:"
     echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa'"
     exit 1
 }
 
-# Set verbose, debug, and assay design options to false by default
+# Set default options
 verbose=false
 debug=false
 design_kasp=false
 design_caps=false
+max_temp=""
+max_price=""
+max_size=""
+keep_anyway=0
 
 # Check if there are no arguments
 if [ $# -eq 0 ]; then
@@ -75,6 +80,22 @@ while [[ $# -gt 0 ]]; do
             ;;
         -c|--caps)
             design_caps=true
+            shift
+            ;;
+        -m|--max-temp)
+            max_temp="$2"
+            shift 2
+            ;;
+        -p|--max-price)
+            max_price="$2"
+            shift 2
+            ;;
+        -x|--max-size)
+            max_size="$2"
+            shift 2
+            ;;
+        -r|--keep-anyway)
+            keep_anyway=1
             shift
             ;;
         -h|--help)
@@ -344,14 +365,13 @@ for i in temp_marker*; do
 done
 
 if [ $design_kasp = true ]; then
-    cmd6 = script_path + "getkasp3.py " + max_Tm + " " + max_size + " " + pick_anyway # add blast option
-    print("Step 6: Get KASP primers for each marker command:\n", cmd6)
-    call(cmd6, shell=True)
+    # Run design
+    python3 "$script_dir/bin/getkasp3.py" $max_temp $max_size $pick_anyway $(which primer3_core) $(which muscle)> getkasp3.py.log
 fi
 
 if [ $design_caps = true ]; then
     # Run design
-    
+    python3 "$script_dir/bin/getCAPS.py" $max_temp $max_size $pick_anyway > getCAPS.py.log
 fi
 
 # Change back to working directory

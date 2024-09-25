@@ -22,7 +22,11 @@ if [ "$1" = "local" ]; then
         --output-file 'test.txt' \
         --snps 'test_snps.txt' \
         --verbose \
-        --debug
+        --debug \
+        --kasp \
+        --max-temp 63 \
+        --max-price 200 \
+        --max-size 25 
 else
     # module load miniconda
     module load miniconda3
@@ -37,7 +41,11 @@ else
         --output-file 'test.txt' \
         --snps 'test_snps.txt' \
         --verbose \
-        --debug
+        --debug \
+        --kasp \
+        --max-temp 63 \
+        --max-price 200 \
+        --max-size 25 
 fi
 
 

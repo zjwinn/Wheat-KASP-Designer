@@ -43,8 +43,8 @@ import copy
 max_Tm = sys.argv[1] # max Tm, default 63, can be increased in case high GC region
 max_size = sys.argv[2] # max primer size, default 25, can be increased in case low GC region
 pick_anyway = sys.argv[3] # pick primer anyway even if it violates specific constrains
-primer3_path = sys.argv[5] # define the path of primer3
-muscle_path = sys.argv[6] # define the path of muscle
+primer3_path = sys.argv[4] # define the path of primer3
+muscle_path = sys.argv[5] # define the path of muscle
 
 # get all the raw sequences
 raw = glob("flanking_temp_marker*") # All file names start from "flanking"
