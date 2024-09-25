@@ -366,7 +366,7 @@ done
 
 if [ $design_kasp = true ]; then
     # Run design
-    python3 "$script_dir/bin/getkasp3.py" $max_temp $max_size $pick_anyway $(which primer3_core) $(which muscle)> getkasp3.py.log
+    python3 "$script_dir/bin/getkasp3.py" $max_temp $max_size $pick_anyway > getkasp3.py.log
 fi
 
 if [ $design_caps = true ]; then
