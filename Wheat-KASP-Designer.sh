@@ -23,7 +23,6 @@ usage() {
     echo 
     echo "Arguments:"
     echo -e "\t-i, --input-file        realpath to a properly formatted, gzipped VCF file (.vcf.gz)"
-    echo -e "\t-o, --output-file       name of the output file (tab-delimited)"
     echo -e "\t-r, --reference-geno    realpath to a reference genome file (.fa)"
     echo -e "\t-s, --snps              a .txt file with a vector of SNP names to subset from the VCF"
     echo -e "\t-k, --kasp              indicates to design KASP assays"
@@ -34,7 +33,7 @@ usage() {
     echo -e "\t-a, --keep-anyway       indicates to keep markers even when failing filters"    
     echo
     echo "Examples:"
-    echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa'"
+    echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa' -s 'snps.txt' -k -m 63 -p 200 -x 25 -v"
     exit 1
 }
 
@@ -60,10 +59,6 @@ while [[ $# -gt 0 ]]; do
     case $key in
         -i|--input-file)
             input_file=$(realpath "$2")
-            shift 2
-            ;;
-        -o|--output-file)
-            output_file=$(realpath "$2")
             shift 2
             ;;
         -r|--reference-geno)
