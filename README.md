@@ -1,10 +1,37 @@
 # Wheat KASP Designer Script
 
+## Description
+This Bash script is designed to process a known reference genome (.fa) and a variant calling format (VCF) file to report subgenome-specific KASP markers for wheat (Triticum aestivum L.). It includes functionality for quality assessment and optional marker design (KASP and CAPS assays).
+
 ## Acknowledgment
 This script is based on the foundational work done in the [SNP Primer Pipeline 2](https://github.com/pinbo/snp_primer_pipeline2?tab=readme-ov-file) by the user [@pinbo](https://github.com/pinbo). The SNP Primer Pipeline 2 provides a robust framework for designing primers for SNP genotyping, which has been adapted and extended in this Wheat KASP Designer script to handle some preliminary bioinformatics work and cater specifically to wheat (Triticum aestivum L.) KASP/CAPS marker design. For more details on the original pipeline, including its features and usage, please refer to the [SNP Primer Pipeline 2 README](https://github.com/pinbo/SNP_Primer_Pipeline2/blob/master/README.md).
 
-## Description
-This Bash script is designed to process a known reference genome (.fa) and a variant calling format (VCF) file to report subgenome-specific KASP markers for wheat (Triticum aestivum L.). It includes functionality for quality assessment and optional marker design (KASP and CAPS assays).
+## Downloading and Execution
+
+On a linux system with git and conda installed, use the following commands to clone and run the following batch file:
+
+```bash
+# Navigate to where you want to clone to
+cd "/my/favorite/directory"
+
+# Clone repo
+git clone https://github.com/zjwinn/Wheat-KASP-Designer
+
+# Initiate the submodule
+git submodule init
+
+# Update the submodule 
+git submodule update
+
+# Create conda environment
+conda env create -f wkd_env.yml
+
+# Activate that environment
+conda activate wkd_env
+
+# Run the function
+bash ./wheat_kasp_designer.sh
+```
 
 ## Usage
 ```bash
