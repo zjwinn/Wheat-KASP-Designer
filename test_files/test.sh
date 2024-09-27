@@ -19,13 +19,11 @@ if [ "$1" = "local" ]; then
     bash ../Wheat-KASP-Designer.sh \
         --input-file 'NC13-20076xGA06493-13LE6_filt_fixed.vcf.gz' \
         --reference-geno  '/mnt/c/Users/zwinn/Music/Ref/161010_Chinese_Spring_v1.0_pseudomolecules.fasta' \
-        --output-file 'test.txt' \
         --snps 'test_snps.txt' \
         --verbose \
         --kasp \
-        --max-temp 63 \
-        --max-price 200 \
-        --max-size 25 
+        --debug
+        
 else
     # module load miniconda
     module load miniconda3
@@ -37,7 +35,6 @@ else
     bash ../Wheat-KASP-Designer.sh \
         --input-file 'NC13-20076xGA06493-13LE6_filt_fixed.vcf.gz' \
         --reference-geno  '/project/90daydata/gbru_wheat2/zjwinn_project_directory/Ref/161010_Chinese_Spring_v1.0_pseudomolecules.fasta' \
-        --output-file 'test.txt' \
         --snps 'test_snps.txt' \
         --verbose \
         --debug \

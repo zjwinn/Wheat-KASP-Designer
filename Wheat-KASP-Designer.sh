@@ -20,17 +20,18 @@ usage() {
     echo "Options:"
     echo -e "\t-h, --help              Display this help and exit"
     echo -e "\t-v, --verbose           Display text feedback (default option is false)"
+    echo -e "\t-a, --keep-anyway       indicates to keep markers even when failing filters" 
+    echo -e "\t-k, --kasp              indicates to design KASP assays"
+    echo -e "\t-c, --caps              indicates to design CAPS assays"     
     echo 
     echo "Arguments:"
     echo -e "\t-i, --input-file        realpath to a properly formatted, gzipped VCF file (.vcf.gz)"
     echo -e "\t-r, --reference-geno    realpath to a reference genome file (.fa)"
     echo -e "\t-s, --snps              a .txt file with a vector of SNP names to subset from the VCF"
-    echo -e "\t-k, --kasp              indicates to design KASP assays"
-    echo -e "\t-c, --caps              indicates to design CAPS assays"
-    echo -e "\t-m, --max-temp          a maximum temperature indicated in Celsius"
-    echo -e "\t-p, --max-price         a maximum price in USD"
-    echo -e "\t-x, --max-size          a maximum size in base pairs" 
-    echo -e "\t-a, --keep-anyway       indicates to keep markers even when failing filters"    
+    echo -e "\t-m, --max-temp          a maximum temperature indicated in Celsius (default 64)"
+    echo -e "\t-p, --max-price         a maximum price in USD (default 200)"
+    echo -e "\t-x, --max-size          a maximum size of the primer in base pairs (default 25)"
+    echo -e "\t-j, --product-size      a maximum amplicon product size in base pairs (default 150)"  
     echo
     echo "Examples:"
     echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa' -s 'snps.txt' -k -m 63 -p 200 -x 25 -v"
@@ -42,9 +43,10 @@ verbose=false
 debug=false
 design_kasp=false
 design_caps=false
-max_temp=""
-max_price=""
-max_size=""
+max_temp=64
+max_price=200
+max_size=25
+product_size_threshold=150
 pick_anyway=0
 
 # Check if there are no arguments
@@ -89,6 +91,10 @@ while [[ $# -gt 0 ]]; do
             max_size="$2"
             shift 2
             ;;
+        -j|--product-size)
+            product_size_threshold="$2"
+            shift 2
+            ;;            
         -a|--keep-anyway)
             keep_anyway=1
             shift
@@ -120,8 +126,8 @@ if [ "$debug" = true ]; then
 fi
 
 # Check if required options are provided
-if [ -z "$input_file" ] || [ -z "$output_file" ] || [ -z "$reference_geno" ]; then
-    echo "*** Error: Input file, output file, and reference genome file are required." >&2
+if [ -z "$input_file" ] || [ -z "$reference_geno" ]; then
+    echo "*** Error: Input file and reference genome file are required." >&2
     usage
 fi
 
@@ -481,10 +487,92 @@ concat_filtered_files() {
     done
 }
 
+# Check verbose
+if [ "$verbose" = true ]; then
+    # Print
+    echo
+    echo "#######################################################"
+    echo "# Concating output and performing BLAST per primer... #"
+    echo "#######################################################"
+fi 
+
 # Check if there is KASP output and concatenate if there is (silently)
 if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
-    concat_filtered_files "./KASP_output" "$working_directory/Potential_KASP_primers.tsv" "selected_KASP_primers"
+    # Send debug messages
+    if [ "$debug" = true ]; then
+        echo "### Concating KASP files..."
+        echo
+    fi
+
+    # Step 1: Concat
+    concat_filtered_files "./KASP_output" "Potential_KASP_primers.tsv" "selected_KASP_primers"
+    
+    # Send debug messages
+    if [ "$debug" = true ]; then
+        echo "### Filtering KASP files..."
+        echo
+    fi
+
+    # Step 2: Filter based on product size
+    awk -v threshold="$product_size_threshold" '$2 > threshold' "Potential_KASP_primers.tsv" > "tmp_filtered"
+    awk -v threshold="$product_size_threshold" -F"\t" '{if ($2 + 0 <= threshold) print $0;}' "Potential_KASP_primers.tsv" > "tmp_filtered"
+
+
+    # Send debug messages
+    if [ "$debug" = true ]; then
+        echo "### Creating template for BLAST of KASP files..."
+        echo
+    fi
+
+    # Step 3: Prepare the output file with headers
+    echo -e "index\tproduct_size\ttype\tstart\tend\tvariation\t3'diffall\tlength\tTm\tGCcontent\tany\t3'\tend_stability\thairpin\tprimer_seq\tReverseComplement\tpenalty\tcompl_any\tcompl_end\tscore\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore" > "tmp_blast_output.tsv"
+    
+    # Skip first line
+    first_line=true
+
+    # Step 4: Loop through filtered sequences and run BLAST
+    while IFS=$'\t' read -r index product_size type start end variation _ length tm gc_content any three_end end_stability hairpin primer_seq reverse_complement penalty compl_any compl_end score; do
+        # Skip first line
+        if [ "$first_line" = true ]; then
+            first_line=false
+            continue  # Skip the first line
+        fi       
+        
+        # Output each sequence for BLAST
+        echo ">${index}" > temp_sequence.fa
+        echo "$primer_seq" >> temp_sequence.fa
+            
+        # Send debug messages
+        if [ "$debug" = true ]; then
+            echo "### BLASTING  KASP files line..."
+            echo
+        fi
+
+        # Run BLAST (you can customize the parameters as needed)
+        blastn -task blastn-short \
+            -query temp_sequence.fa \
+            -db $reference_geno \
+            -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" \
+            -perc_identity 100 \
+            -qcov_hsp_perc 100  > temp_blast.txt
+        
+        # Check if BLAST returned hits
+        if [ -s temp_blast.txt ]; then
+            # Append each BLAST hit to the original row
+            while IFS=$'\t' read -r qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore; do
+                # Echo line 
+                echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation}\t_\t${length}\t${tm}\t${gc_content}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\t$sseqid\t$pident\t$length\t$mismatch\t$gapopen\t$qstart\t$qend\t$sstart\t$send\t$evalue\t$bitscore" >> "tmp_blast_output.tsv"
+            done < temp_blast.txt
+        else
+            # If no hits, append the original row with empty columns for BLAST results
+            echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation}\t_\t${length}\t${tm}\t${gc_content}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> "tmp_blast_output.tsv"
+        fi
+    done < "tmp_filtered"
+
+    # Step 5: Move the BLAST-processed data to the final output
+    mv "tmp_blast_output.tsv" "$working_directory/Potential_KASP_primers.tsv"
 fi
+
 
 # Check if there is CAPS output and concatenate if there is (silently)
 if [ $(find ./CAPS_output/ -name "selected_CAPS_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
