@@ -341,7 +341,7 @@ fi
 awk 'NR > 1 {print $3 "," $1 "," $6}' snp_seq_pull_output.txt > snp_seq_pull_output.csv
 
 # Parse polymarker
-python3 "$script_dir/bin/parse_polymarker_input.py" snp_seq_pull_output.csv > parse_polymarker_input.py.log
+python3 "$script_dir/SNP_Primer_Pipeline2/bin/parse_polymarker_input.py" snp_seq_pull_output.csv > parse_polymarker_input.py.log
 
 # Check verbose
 if [ "$verbose" = true ]; then
@@ -364,7 +364,7 @@ if [ "$verbose" = true ]; then
 fi
 
 # Parse the blast output file and output the homelog contigs and flanking ranges
-python3 "$script_dir/bin/getflanking.py" snp_seq_pull_output.csv blast_out.txt temp_range.txt 3 > getflanking.py.log
+python3 "$script_dir/SNP_Primer_Pipeline2/bin/getflanking.py" snp_seq_pull_output.csv blast_out.txt temp_range.txt 3 > getflanking.py.log
 
 # Replace - with \t in temp_range.txt
 awk -F '\t' 'BEGIN {OFS = FS} {gsub(/-/, "\t", $3); print}' temp_range.txt > temp_range_mod.txt
@@ -402,7 +402,7 @@ if [ $design_kasp = true ]; then
     fi    
     
     # Run design
-    python3 "$script_dir/bin/getkasp3.py" "$max_temp" "$max_size" "$pick_anyway" > getkasp3.py.log
+    python3 "$script_dir/SNP_Primer_Pipeline2/bin/getkasp3.py" "$max_temp" "$max_size" "$pick_anyway" > getkasp3.py.log
 fi
 
 # Check to make CAPS
@@ -417,7 +417,7 @@ if [ $design_caps = true ]; then
     fi    
     
     # Run design
-    python3 "$script_dir/bin/getCAPS.py" "$max_price" "$max_temp" "$max_size" "$pick_anyway" > getCAPS.py.log
+    python3 "$script_dir/SNP_Primer_Pipeline2/bin/getCAPS.py" "$max_price" "$max_temp" "$max_size" "$pick_anyway" > getCAPS.py.log
 fi
 
 # Define the expected number of columns
