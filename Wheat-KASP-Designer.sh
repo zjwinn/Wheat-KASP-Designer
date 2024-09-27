@@ -437,9 +437,7 @@ concat_filtered_files() {
 
     if [ "$debug" = true ]; then
         echo
-        echo "#############################"
-        echo "# File parsing script debug #"
-        echo "#############################"
+        echo "### File parsing script debug"
         echo 
         echo "### Processing files in directory: $input_dir"
         echo "### Looking for files matching pattern: $file_pattern"
@@ -498,12 +496,6 @@ fi
 
 # Check if there is KASP output and concatenate if there is (silently)
 if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
-    # Send debug messages
-    if [ "$debug" = true ]; then
-        echo "### Concating KASP files..."
-        echo
-    fi
-
     # Step 1: Concat
     concat_filtered_files "./KASP_output" "Potential_KASP_primers.tsv" "selected_KASP_primers"
     
@@ -514,9 +506,7 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
     fi
 
     # Step 2: Filter based on product size
-    awk -v threshold="$product_size_threshold" '$2 > threshold' "Potential_KASP_primers.tsv" > "tmp_filtered"
     awk -v threshold="$product_size_threshold" -F"\t" '{if ($2 + 0 <= threshold) print $0;}' "Potential_KASP_primers.tsv" > "tmp_filtered"
-
 
     # Send debug messages
     if [ "$debug" = true ]; then
@@ -530,6 +520,9 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
     # Skip first line
     first_line=true
 
+    # Line number
+    line_number=1
+
     # Step 4: Loop through filtered sequences and run BLAST
     while IFS=$'\t' read -r index product_size type start end variation _ length tm gc_content any three_end end_stability hairpin primer_seq reverse_complement penalty compl_any compl_end score; do
         # Skip first line
@@ -542,10 +535,12 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
         echo ">${index}" > temp_sequence.fa
         echo "$primer_seq" >> temp_sequence.fa
             
-        # Send debug messages
-        if [ "$debug" = true ]; then
-            echo "### BLASTING  KASP files line..."
-            echo
+        # Send verbose messages
+        if [ "$verbose" = true ]; then
+            echo "########################################"
+            echo "# BLASTING KASP file primer number = "$line_number
+            echo "########################################"
+            line_number=$((line_number + 1))
         fi
 
         # Run BLAST (you can customize the parameters as needed)
@@ -578,9 +573,6 @@ fi
 if [ $(find ./CAPS_output/ -name "selected_CAPS_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
     concat_filtered_files "./CAPS_output" "$working_directory/Potential_CAPS_primers.tsv" "selected_CAPS_primers"
 fi
-
-# Change back to working directory
-cd "$working_directory"
 
 # Check verbose
 if [ "$verbose" = true ]; then

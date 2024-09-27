@@ -15,7 +15,7 @@
 
 # Check for local argument
 if [ "$1" = "local" ]; then
-# Run test file (local)
+    # Run test file (local)
     bash ../Wheat-KASP-Designer.sh \
         --input-file 'NC13-20076xGA06493-13LE6_filt_fixed.vcf.gz' \
         --reference-geno  '/mnt/c/Users/zwinn/Music/Ref/161010_Chinese_Spring_v1.0_pseudomolecules.fasta' \
@@ -23,7 +23,7 @@ if [ "$1" = "local" ]; then
         --verbose \
         --kasp \
         --debug
-        
+
 else
     # module load miniconda
     module load miniconda3
