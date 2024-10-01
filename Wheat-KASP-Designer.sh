@@ -31,10 +31,11 @@ usage() {
     echo -e "\t-m, --max-temp          a maximum temperature indicated in Celsius (default 64)"
     echo -e "\t-p, --max-price         a maximum price in USD (default 200)"
     echo -e "\t-x, --max-size          a maximum size of the primer in base pairs (default 25)"
-    echo -e "\t-j, --product-size      a maximum amplicon product size in base pairs (default 150)"  
+    echo -e "\t-j, --product-size      a maximum amplicon product size in base pairs (default 150)"
+    echo -e "\t-u, --unique-id         a unique identifyer for the reference for the marker design (e.g., CHS21 for Chinese Spring Version 2.1)"  
     echo
     echo "Examples:"
-    echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa' -s 'snps.txt' -k -m 63 -p 200 -x 25 -v"
+    echo -e "\t$(realpath $0) -i 'input_file.vcf.gz' -o 'output.txt' -r 'reference_genome.fa' -s 'snps.txt' -k -m 63 -p 200 -x 25 -u CHS21 -v"
     exit 1
 }
 
@@ -94,7 +95,11 @@ while [[ $# -gt 0 ]]; do
         -j|--product-size)
             product_size_threshold="$2"
             shift 2
-            ;;            
+            ;;
+        -u|--unique-id)
+            unique_id="$2"
+            shift 2
+            ;;                        
         -a|--keep-anyway)
             keep_anyway=1
             shift
@@ -496,7 +501,7 @@ fi
 
 # Check if there is KASP output and concatenate if there is (silently)
 if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
-    # Step 1: Concat
+    # Step 1: Concatenate
     concat_filtered_files "./KASP_output" "Potential_KASP_primers.tsv" "selected_KASP_primers"
     
     # Send debug messages
@@ -508,14 +513,20 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
     # Step 2: Filter based on product size
     awk -v threshold="$product_size_threshold" -F"\t" '{if ($2 + 0 <= threshold) print $0;}' "Potential_KASP_primers.tsv" > "tmp_filtered"
 
+    # Step 3: Rename SNPs based on ref/alt info
+    python3 "$script_dir/bin/parse_ref_alt.py" tmp_filtered snp_seq_pull_input.txt $unique_id tmp_filtered_rename.tsv > parse_ref_alt.py.log
+
+    # Move that into position
+    mv tmp_filtered_rename.tsv tmp_filtered
+
     # Send debug messages
     if [ "$debug" = true ]; then
         echo "### Creating template for BLAST of KASP files..."
         echo
     fi
 
-    # Step 3: Prepare the output file with headers
-    echo -e "index\tproduct_size\ttype\tstart\tend\tvariation\t3'diffall\tlength\tTm\tGCcontent\tany\t3'\tend_stability\thairpin\tprimer_seq\tReverseComplement\tpenalty\tcompl_any\tcompl_end\tscore\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore" > "tmp_blast_output.tsv"
+    # Step 4: Prepare the output file with headers
+    echo -e "index\tproduct_size\ttype\tstart\tend\tvariation_number\t3'diffall\tlength\ttm\tgccontent\tany\t3'\tend_stability\thairpin\tprimer_seq\treversecomplement\tpenalty\tcompl_any\tcompl_end\tscore\tstandardized_name\tref/alt\tdesigned_primer\tstrand_orientation\tqseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore" > "tmp_blast_output.tsv"
     
     # Skip first line
     first_line=true
@@ -523,14 +534,14 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
     # Line number
     line_number=1
 
-    # Step 4: Loop through filtered sequences and run BLAST
-    while IFS=$'\t' read -r index product_size type start end variation _ length tm gc_content any three_end end_stability hairpin primer_seq reverse_complement penalty compl_any compl_end score; do
+    # Step 5: Loop through filtered sequences and run BLAST
+    while IFS=$'\t' read -r index product_size type start end variation_number _ length tm gccontent any three_end end_stability hairpin primer_seq reverse_complement penalty compl_any compl_end score standardized_name ref_alt designed_primer strand_orientation; do
         # Skip first line
         if [ "$first_line" = true ]; then
             first_line=false
             continue  # Skip the first line
         fi       
-        
+
         # Output each sequence for BLAST
         echo ">${index}" > temp_sequence.fa
         echo "$primer_seq" >> temp_sequence.fa
@@ -538,41 +549,43 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
         # Send verbose messages
         if [ "$verbose" = true ]; then
             echo "########################################"
-            echo "# BLASTING KASP file primer number = "$line_number
+            echo "# BLASTING KASP file primer number = $line_number"
             echo "########################################"
-            line_number=$((line_number + 1))
         fi
 
         # Run BLAST (you can customize the parameters as needed)
         blastn -task blastn-short \
             -query temp_sequence.fa \
-            -db $reference_geno \
+            -db "$reference_geno" \
             -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" \
             -perc_identity 100 \
-            -qcov_hsp_perc 100  > temp_blast.txt
+            -qcov_hsp_perc 100 > temp_blast.txt
         
         # Check if BLAST returned hits
         if [ -s temp_blast.txt ]; then
             # Append each BLAST hit to the original row
             while IFS=$'\t' read -r qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore; do
                 # Echo line 
-                echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation}\t_\t${length}\t${tm}\t${gc_content}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\t$sseqid\t$pident\t$length\t$mismatch\t$gapopen\t$qstart\t$qend\t$sstart\t$send\t$evalue\t$bitscore" >> "tmp_blast_output.tsv"
+                echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation_number}\t_\t${length}\t${tm}\t${gccontent}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\t${standardized_name}\t${ref_alt}\t${designed_primer}\t${strand_orientation}\t$qseqid\t$sseqid\t$pident\t$length\t$mismatch\t$gapopen\t$qstart\t$qend\t$sstart\t$send\t$evalue\t$bitscore" >> "tmp_blast_output.tsv"
             done < temp_blast.txt
         else
             # If no hits, append the original row with empty columns for BLAST results
-            echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation}\t_\t${length}\t${tm}\t${gc_content}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> "tmp_blast_output.tsv"
+            echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation_number}\t_\t${length}\t${tm}\t${gccontent}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\t${standardized_name}\t${ref_alt}\t${designed_primer}\t${strand_orientation}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> "tmp_blast_output.tsv"
         fi
+        
+        line_number=$((line_number + 1))  # Increment line number
     done < "tmp_filtered"
 
-    # Step 5: Move the BLAST-processed data to the final output
+    # Step 6: Move the BLAST-processed data to the final output
     mv "tmp_blast_output.tsv" "$working_directory/Potential_KASP_primers.tsv"
 fi
 
-
 # Check if there is CAPS output and concatenate if there is (silently)
-if [ $(find ./CAPS_output/ -name "selected_CAPS_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
-    concat_filtered_files "./CAPS_output" "$working_directory/Potential_CAPS_primers.tsv" "selected_CAPS_primers"
+if [ $(find ./CAPS_output/ -name "Potential_CAPS_primers*" 2>/dev/null | wc -l) -gt 0 ]; then
+    # Step 1: Concat
+    concat_filtered_files "./CAPS_output" "Potential_CAPS_primers.tsv" "Potential_CAPS_primers"
 fi
+
 
 # Check verbose
 if [ "$verbose" = true ]; then

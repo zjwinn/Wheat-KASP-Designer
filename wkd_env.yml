@@ -8,11 +8,13 @@ dependencies:
   - _openmp_mutex=4.5=2_gnu
   - bcftools=1.21=h8b25389_0
   - bedtools=2.31.1=hf5e1c6e_2
+  - blas=1.0=openblas
   - blast=2.16.0=hc155240_2
+  - bottleneck=1.3.7=py312ha883a20_0
   - bwa=0.7.18=he4a0461_1
   - bzip2=1.0.8=h4bc722e_7
   - c-ares=1.33.1=heb4867d_0
-  - ca-certificates=2024.8.30=hbcca054_0
+  - ca-certificates=2024.9.24=h06a4308_0
   - curl=8.10.1=hbbe4b11_0
   - entrez-direct=22.4=he881be0_0
   - gettext=0.22.5=he02047a_3
@@ -21,6 +23,7 @@ dependencies:
   - htslib=1.21=h5efdd21_0
   - keyutils=1.6.1=h166bdaf_0
   - krb5=1.21.3=h659f571_0
+  - ld_impl_linux-64=2.40=h12ee557_0
   - libasprintf=0.22.5=he8f35ee_3
   - libasprintf-devel=0.22.5=he8f35ee_3
   - libblas=3.9.0=24_linux64_openblas
@@ -29,6 +32,8 @@ dependencies:
   - libdeflate=1.21=h4bc722e_0
   - libedit=3.1.20191231=he28a2e2_2
   - libev=4.33=hd590300_2
+  - libexpat=2.6.3=h5888daf_0
+  - libffi=3.4.4=h6a678d5_1
   - libgcc=14.1.0=h77fa898_1
   - libgcc-ng=14.1.0=h69a702a_1
   - libgettextpo=0.22.5=he02047a_3
@@ -39,18 +44,24 @@ dependencies:
   - libgomp=14.1.0=h77fa898_1
   - libidn2=2.3.7=hd590300_0
   - libnghttp2=1.58.0=h47da74e_1
+  - libnsl=2.0.1=hd590300_0
   - libopenblas=0.3.27=pthreads_hac2b453_1
   - libsqlite=3.46.1=hadc24fc_0
   - libssh2=1.11.0=h0841786_0
   - libstdcxx=14.1.0=hc0a3c3a_1
   - libstdcxx-ng=14.1.0=h4852527_1
   - libunistring=0.9.10=h7f98852_0
+  - libuuid=2.38.1=h0b41bf4_0
   - libxcrypt=4.4.36=hd590300_1
   - libzlib=1.3.1=h4ab18f5_1
   - muscle=5.1=h4ac6f70_3
   - ncbi-vdb=3.1.1=h4ac6f70_2
   - ncurses=6.5=he02047a_1
+  - numexpr=2.8.7=py312he7dcb8a_0
+  - numpy=1.26.4=py312h2809609_0
+  - numpy-base=1.26.4=py312he1a6c75_0
   - openssl=3.3.2=hb9d3cd8_0
+  - pandas=2.2.2=py312h526ad5a_0
   - perl=5.32.1=7_hd590300_perl5
   - perl-archive-tar=2.40=pl5321hdfd78af_0
   - perl-carp=1.38=pl5321hdfd78af_4
@@ -71,11 +82,22 @@ dependencies:
   - perl-pathtools=3.75=pl5321hec16e2b_3
   - perl-scalar-list-utils=1.62=pl5321hec16e2b_1
   - perl-types-serialiser=1.01=pl5321hdfd78af_0
+  - pip=24.2=py312h06a4308_0
   - primer3=2.6.1=pl5321hdbdd923_5
+  - python=3.12.6=hc5c86c4_2_cpython
+  - python-dateutil=2.9.0post0=py312h06a4308_2
+  - python-tzdata=2023.3=pyhd3eb1b0_0
+  - pytz=2024.1=py312h06a4308_0
+  - readline=8.2=h5eee18b_0
   - rpsbproc=0.5.0=h6a68c12_0
   - samtools=1.21=h50ea8bc_0
+  - setuptools=75.1.0=py312h06a4308_0
+  - six=1.16.0=pyhd3eb1b0_1
+  - tk=8.6.13=noxft_h4845f30_101
+  - tzdata=2024a=h04d1e81_0
   - vcftools=0.1.16=pl5321hdcf5f25_11
   - wget=1.21.4=hda4d442_0
+  - wheel=0.44.0=py312h06a4308_0
   - xz=5.2.6=h166bdaf_0
   - zlib=1.3.1=h4ab18f5_1
   - zstd=1.5.6=ha6fb4c9_0
