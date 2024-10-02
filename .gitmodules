@@ -4,3 +4,5 @@
 [submodule "SNP_Primer_Pipeline2"]
 	path = SNP_Primer_Pipeline2
 	url = https://github.com/pinbo/SNP_Primer_Pipeline2
+[submodule "./SNP_Primer_Pipeline2"]
+	url = https://github.com/zjwinn/SNP_Primer_Pipeline2
