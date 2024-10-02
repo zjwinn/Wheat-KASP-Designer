@@ -19,7 +19,7 @@ if [ "$1" = "local" ]; then
     bash ../Wheat-KASP-Designer.sh \
         --input-file 'NC13-20076xGA06493-13LE6_filt_fixed.vcf.gz' \
         --reference-geno  '/mnt/c/Users/zwinn/Music/Ref/161010_Chinese_Spring_v1.0_pseudomolecules.fasta' \
-        --snps 'test_snps.txt' \
+        --snps 'short_test_snps.txt' \
         --unique-id 'CHS10' \
         --verbose \
         --kasp \

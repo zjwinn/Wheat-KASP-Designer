@@ -148,12 +148,6 @@ if [ ! -f "$reference_geno" ]; then
     usage
 fi
 
-# Get realpath of snp file
-if [ -n "$snp_list" ]; then
-    # Convert to real path
-    real_path_snp_list=$(realpath "$snp_list")
-fi
-
 # Check verbose
 if [ "$verbose" = true ]; then
     # Print header
@@ -216,7 +210,7 @@ cd $tmp_dir
 if [ "$debug" = true ]; then
     echo
     echo "### Temporary directory: $tmp_dir"
-    echo "### SNP list: $real_path_snp_list"
+    echo "### SNP list: $snp_list"
     echo "### Current WD: $(pwd)"
 fi
 
@@ -281,7 +275,7 @@ else
 
     # Run vcftools to subset SNP
     vcftools --gzvcf "$input_file" \
-        --snps "$real_path_snp_list" \
+        --snps "$snp_list" \
         --min-alleles 2 \
         --max-alleles 2 \
         --temp "$temp_dir" \
@@ -398,7 +392,7 @@ fi
 # For each marker in temp_marker
 for i in temp_marker*; do 
     # Extract flanking sequence from database
-    bedtools getfasta -fi $reference_geno -bed $i  -fo flanking_$i.fa
+    bedtools getfasta -fi $reference_geno -bed $i  -fo flanking_$(basename $i).fa
 done
 
 # Check to make KASP 
