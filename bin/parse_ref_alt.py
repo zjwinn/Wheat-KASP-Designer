@@ -59,7 +59,8 @@ def main(primers_file, variants_file, standardized_prefix, output_file):
     alt_strand_orientation = ''
     cr_counter = 1  # Initialize counter for common reverse primers (CR primers)
 
-    last_allele_label = None  # Variable to track the last allele label (AL1 or AL2) and reset the CR counter if necessary
+    last_allele_label = None  # Variable to track the last allele label (AL1 or AL2)
+    last_orientation = '+'  # Variable to store the last assigned orientation for consistency
 
     # Loop through each row in the primer DataFrame
     for index, row in primers_df.iterrows():
@@ -97,7 +98,8 @@ def main(primers_file, variants_file, standardized_prefix, output_file):
         if 'common' in row['index'].lower():
             label = 'CR'  # Label common primers as 'CR'
             designed_primer = row['primer_seq']  # Keep the common primer sequence as is
-            strand_orientation = '-'  # Set default strand orientation for common primers as '-'
+            # Set the strand orientation to the last assigned orientation for consistency
+            primers_df.loc[index, 'Strand Orientation'] = last_orientation
             common_reverse_label = f"CR{cr_counter}"  # Add CR followed by the current counter value
             cr_counter += 1  # Increment the CR counter for the next common reverse primer
             
@@ -129,11 +131,13 @@ def main(primers_file, variants_file, standardized_prefix, output_file):
         # Set the Ref/Alt label, designed primer sequence, and strand orientation in the DataFrame
         primers_df.loc[index, 'Ref/Alt'] = label
         primers_df.loc[index, 'Designed Primer'] = designed_primer
-        primers_df.loc[index, 'Strand Orientation'] = strand_orientation
-
-        # If this is a common primer, adjust the strand orientation based on Ref/Alt orientations
-        if common_reverse_label:
-            primers_df.loc[index, 'Strand Orientation'] = '-' if strand_orientation == '-' else '+'
+        
+        # Update the last assigned orientation after processing Ref or Alt primers
+        if label == "Ref" or label == "Alt":
+            last_allele_label = label  # Update the last allele label
+            last_orientation = strand_orientation  # Store the last assigned orientation
+        
+        primers_df.loc[index, 'Strand Orientation'] = strand_orientation  # Assign the strand orientation for Ref/Alt primers
 
     # Clean up the DataFrame column names by converting spaces to underscores and lowercase
     primers_df.columns = primers_df.columns.str.replace(' ', '_').str.lower()
