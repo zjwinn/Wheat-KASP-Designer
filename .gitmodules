@@ -3,4 +3,4 @@
 	url = https://github.com/zjwinn/SNP-Sequence-Puller.git
 [submodule "SNP_Primer_Pipeline2"]
 	path = SNP_Primer_Pipeline2
-	url = https://github.com/zjwinn/SNP_Primer_Pipeline2
+	url = https://github.com/zjwinn/SNP_Primer_Pipeline2.git
