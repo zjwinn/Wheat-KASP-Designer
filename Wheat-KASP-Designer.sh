@@ -131,8 +131,8 @@ if [ "$debug" = true ]; then
 fi
 
 # Check if required options are provided
-if [ -z "$input_file" ] || [ -z "$reference_geno" ]; then
-    echo "*** Error: Input file and reference genome file are required." >&2
+if [ -z "$input_file" ] || [ -z "$reference_geno" ] || [ -z "$unique_id" ]; then
+    echo "*** Error: Input file, reference genome file, and unique id are required." >&2
     usage
 fi
 
@@ -570,7 +570,7 @@ if [ $(find ./KASP_output/ -name "selected_KASP_primers*" 2>/dev/null | wc -l) -
             done < temp_blast.txt
         else
             # If no hits, append the original row with empty columns for BLAST results
-            echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation_number}\t_\t${length}\t${tm}\t${gccontent}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\t${standardized_name}\t${ref_alt}\t${designed_primer}\t${strand_orientation}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> "tmp_blast_output.tsv"
+            echo -e "${index}\t${product_size}\t${type}\t${start}\t${end}\t${variation_number}\t_\t${length}\t${tm}\t${gccontent}\t${any}\t${three_end}\t${end_stability}\t${hairpin}\t${primer_seq}\t${reverse_complement}\t${penalty}\t${compl_any}\t${compl_end}\t${score}\t${standardized_name}\t${ref_alt}\t${designed_primer}\t${strand_orientation}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> "tmp_blast_output.tsv"
         fi
         
         line_number=$((line_number + 1))  # Increment line number
