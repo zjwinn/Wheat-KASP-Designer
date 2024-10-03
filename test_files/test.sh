@@ -37,7 +37,7 @@ else
         --input-file 'NC13-20076xGA06493-13LE6_filt_fixed.vcf.gz' \
         --reference-geno  '/project/90daydata/gbru_wheat2/zjwinn_project_directory/Ref/161010_Chinese_Spring_v1.0_pseudomolecules.fasta' \
         --snps 'test_snps.txt' \
-        --debug--unique-id 'CHS10' \
+        --unique-id 'CHS10' \
         --verbose \
         --kasp \
         --debug
