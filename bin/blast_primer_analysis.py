@@ -52,11 +52,11 @@ def main(reference_geno, output_file):
                 for line in blast_output.strip().splitlines():
                     # Split the BLAST output into columns
                     blast_columns = line.split("\t")
-                    output_row = f"{index}\t{row['product_size']}\t{row['type']}\t{row['start']}\t{row['end']}\t{row['variation_number']}\t_\t{row['length']}\t{row['tm']}\t{row['gccontent']}\t{row['any']}\t{row['3\'']}\t{row['end_stability']}\t{row['hairpin']}\t{row['primer_seq']}\t{row['reversecomplement']}\t{row['penalty']}\t{row['compl_any']}\t{row['compl_end']}\t{row['score']}\t{row['standardized_name']}\t{row['ref/alt']}\t{row['designed_primer']}\t{row['strand_orientation']}\t" + "\t".join(blast_columns) + "\n"
+                    output_row = f"{row['index']}\t{row['product_size']}\t{row['type']}\t{row['start']}\t{row['end']}\t{row['variation_number']}\t_\t{row['length']}\t{row['tm']}\t{row['gccontent']}\t{row['any']}\t{row['3\'']}\t{row['end_stability']}\t{row['hairpin']}\t{row['primer_seq']}\t{row['reversecomplement']}\t{row['penalty']}\t{row['compl_any']}\t{row['compl_end']}\t{row['score']}\t{row['standardized_name']}\t{row['ref/alt']}\t{row['designed_primer']}\t{row['strand_orientation']}\t" + "\t".join(blast_columns) + "\n"
                     output.write(output_row)
             else:
                 # If no hits, append the original row with empty columns for BLAST results
-                output_row = f"{index}\t{row['product_size']}\t{row['type']}\t{row['start']}\t{row['end']}\t{row['variation_number']}\t_\t{row['length']}\t{row['tm']}\t{row['gccontent']}\t{row['any']}\t{row['3\'']}\t{row['end_stability']}\t{row['hairpin']}\t{row['primer_seq']}\t{row['reversecomplement']}\t{row['penalty']}\t{row['compl_any']}\t{row['compl_end']}\t{row['score']}\t{row['standardized_name']}\t{row['ref/alt']}\t{row['designed_primer']}\t{row['strand_orientation']}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n"
+                output_row = f"{row['index']}\t{row['product_size']}\t{row['type']}\t{row['start']}\t{row['end']}\t{row['variation_number']}\t_\t{row['length']}\t{row['tm']}\t{row['gccontent']}\t{row['any']}\t{row['3\'']}\t{row['end_stability']}\t{row['hairpin']}\t{row['primer_seq']}\t{row['reversecomplement']}\t{row['penalty']}\t{row['compl_any']}\t{row['compl_end']}\t{row['score']}\t{row['standardized_name']}\t{row['ref/alt']}\t{row['designed_primer']}\t{row['strand_orientation']}\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n"
                 output.write(output_row)
 
 if __name__ == "__main__":
