@@ -88,11 +88,5 @@ Indicates to keep markers even when failing filters.
 - Marker Design: Depending on user options, it designs KASP or CAPS markers using auxiliary Python scripts.
 - Output Generation: It consolidates the results and outputs them in specified formats.
 
-## Author
-Written by: Zachary J. Winn, PhD<br>
-Contact Information:<br>
-  Government Email: zachary.winn@usda.gov <br>
-  Personal Email: zwinn@outlook.com <br>
-
 ## Disclaimer
 This program is not under warranty. Use at your own discretion!
